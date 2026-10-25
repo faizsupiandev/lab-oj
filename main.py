@@ -1,4 +1,5 @@
 import os
+import asyncio
 import sqlite3
 import hashlib
 import json
@@ -1318,3 +1319,46 @@ async def admin_session_edit_post(
 @app.on_event("startup")
 async def startup():
     init_db()
+    asyncio.create_task(auto_finalize_expired_sessions())
+
+
+async def auto_finalize_expired_sessions():
+    """Background task: every 60s, auto-finalize sessions where time ran out."""
+    import asyncio
+    while True:
+        await asyncio.sleep(60)
+        try:
+            conn = get_db()
+            # Find IN_PROGRESS attempts where started_at + duration_minutes has passed
+            expired = conn.execute("""
+                SELECT a.id, a.matric_no, a.session_id, a.started_at, s.duration_minutes,
+                       s.window_end
+                FROM student_session_attempts a
+                JOIN lab_sessions s ON a.session_id = s.id
+                WHERE a.status = 'IN_PROGRESS'
+            """).fetchall()
+
+            now = now_myt()
+            finalized = 0
+            for row in expired:
+                started = datetime.fromisoformat(row["started_at"]).replace(tzinfo=None)
+                duration_secs = row["duration_minutes"] * 60
+                elapsed = (now.replace(tzinfo=None) - started).total_seconds()
+                # Also check window_end
+                window_end = datetime.fromisoformat(row["window_end"]).replace(tzinfo=None)
+                time_expired = elapsed >= duration_secs
+                window_expired = now.replace(tzinfo=None) > window_end
+                if time_expired or window_expired:
+                    conn.execute("""
+                        UPDATE student_session_attempts
+                        SET status='SUBMITTED', submitted_at=datetime('now')
+                        WHERE id=?
+                    """, (row["id"],))
+                    finalized += 1
+
+            if finalized > 0:
+                conn.commit()
+                print(f"[auto-finalize] Finalized {finalized} expired session(s)")
+            conn.close()
+        except Exception as e:
+            print(f"[auto-finalize] Error: {e}")

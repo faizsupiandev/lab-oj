@@ -220,8 +220,17 @@ if (SESSION_STATUS === 'IN_PROGRESS') {
 
 function autoSubmit() {
   if (SESSION_STATUS !== 'IN_PROGRESS') return;
-  alert('Time is up! Your answers will be submitted automatically.');
-  document.querySelector('form[action="/sessions/' + SID + '/finalize"]').submit();
+  SESSION_STATUS = 'SUBMITTED'; // prevent double-submit
+  timerEl.textContent = '00:00';
+  timerEl.classList.add('danger');
+  // Show toast instead of blocking alert
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#DC2626;color:#fff;padding:14px 28px;border-radius:12px;font-weight:700;font-size:1rem;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3)';
+  toast.textContent = '⏰ Time is up! Submitting your answers...';
+  document.body.appendChild(toast);
+  setTimeout(function() {
+    document.querySelector('form[action="/sessions/' + SID + '/finalize"]').submit();
+  }, 2000);
 }
 
 // --- Progress counter ---
