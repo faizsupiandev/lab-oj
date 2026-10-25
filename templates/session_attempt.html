@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+{% block title %}{{ session.title }} — Lab UTeM OJ{% endblock %}
+{% block extra_head %}
+<style>
+/* 3-column layout: sidebar | question | code */
+.attempt-layout{display:grid;grid-template-columns:220px 1fr 1.2fr;height:calc(100vh - 60px);overflow:hidden}
+.q-sidebar{background:var(--indigo-d);color:#fff;overflow-y:auto;display:flex;flex-direction:column}
+.q-sidebar-header{padding:16px 16px 10px;border-bottom:1px solid rgba(255,255,255,.1)}
+.q-sidebar-header .title{font-family:'Fraunces',serif;font-weight:700;font-size:0.95rem;color:#fff;margin-bottom:2px}
+.q-sidebar-header .meta{font-size:0.72rem;color:rgba(255,255,255,.55)}
+.q-list{padding:10px 10px;display:flex;flex-direction:column;gap:6px;flex:1}
+.q-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;cursor:pointer;border:2px solid transparent;transition:all .15s;background:rgba(255,255,255,.07)}
+.q-item:hover{background:rgba(255,255,255,.13)}
+.q-item.active{background:#fff;border-color:#fff}
+.q-item.active .q-num{background:var(--indigo);color:#fff}
+.q-item.active .q-title{color:var(--indigo)}
+.q-item.active .q-status-icon{opacity:1}
+/* Status colors */
+.q-item.status-accepted{border-color:#34D399;background:rgba(52,211,153,.15)}
+.q-item.status-accepted .q-num{background:#34D399;color:#065f46}
+.q-item.status-wrong{border-color:#FCA5A5;background:rgba(252,165,165,.12)}
+.q-item.status-wrong .q-num{background:#FCA5A5;color:#991b1b}
+.q-item.status-attempted{border-color:#FCD34D;background:rgba(252,211,77,.1)}
+.q-item.status-attempted .q-num{background:#FCD34D;color:#78350f}
+.q-num{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;color:#fff;flex-shrink:0}
+.q-info{flex:1;min-width:0}
+.q-title{font-size:0.78rem;font-weight:600;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q-item.active .q-title{color:var(--indigo);font-weight:700}
+.q-badge{font-size:0.65rem;font-weight:700;padding:2px 6px;border-radius:6px;display:inline-block;margin-top:2px}
+.q-badge.accepted{background:#34D399;color:#065f46}
+.q-badge.wrong{background:#FCA5A5;color:#991b1b}
+.q-badge.attempted{background:#FCD34D;color:#78350f}
+.q-badge.pending{background:rgba(255,255,255,.2);color:rgba(255,255,255,.6)}
+.q-progress{padding:12px 16px;border-top:1px solid rgba(255,255,255,.1);font-size:0.75rem;color:rgba(255,255,255,.6)}
+.q-progress-bar{height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin-top:6px}
+.q-progress-fill{height:100%;background:#34D399;border-radius:2px;transition:width .3s}
+
+.q-panel{background:var(--indigo);color:#fff;padding:28px 28px;overflow-y:auto}
+.code-panel{background:var(--bg);padding:24px 30px;overflow-y:auto}
+.topbar{background:var(--surface);border-bottom:2px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;height:60px}
+.timer-box{background:var(--indigo);color:#fff;padding:6px 18px;border-radius:20px;font-weight:700;font-size:1rem;font-family:'Fraunces',serif;letter-spacing:.04em}
+.timer-box.warning{background:#D97706}
+.timer-box.danger{background:#DC2626;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+</style>
+{% endblock %}
+{% block body %}
+<!-- Top bar -->
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:14px">
+    <div style="font-family:'Fraunces',serif;font-weight:700;color:var(--indigo)">{{ session.title }}</div>
+    <span style="font-size:0.78rem;color:var(--muted)">{{ session.course_code }}</span>
+    <span style="font-size:0.78rem;color:var(--muted)" id="progress-text"></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    {% if attempt.status == 'IN_PROGRESS' %}
+    <div class="timer-box" id="timer-display">--:--</div>
+    <form method="post" action="/sessions/{{ sid }}/finalize" onsubmit="return confirm('Submit all answers and end session?')">
+      <button type="submit" class="btn btn-primary btn-sm"><span data-i18n="submit">Submit</span> & End</button>
+    </form>
+    {% else %}
+    <span class="badge badge-accepted">✓ Session Complete</span>
+    {% endif %}
+    <button id="lang-toggle" onclick="toggleLang()" style="background:var(--indigo);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:4px 12px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif">BM</button>
+    <a href="/sessions" class="btn btn-secondary btn-sm">← Exit</a>
+  </div>
+</div>
+
+<div class="attempt-layout">
+  <!-- Col 1: Question Sidebar -->
+  <div class="q-sidebar">
+    <div class="q-sidebar-header">
+      <div class="title" data-i18n="questions">Questions</div>
+      <div class="meta">{{ questions|length }} question(s)</div>
+    </div>
+    <div class="q-list" id="q-sidebar-list">
+      {% for q in questions %}
+      {% set sub = submissions.get(q.id) %}
+      {% set status_class = '' %}
+      {% set badge_text = 'Not attempted' %}
+      {% set badge_class = 'pending' %}
+      {% if sub %}
+        {% if sub.status == 'Accepted' %}
+          {% set status_class = 'status-accepted' %}
+          {% set badge_text = '✅ Accepted' %}
+          {% set badge_class = 'accepted' %}
+        {% else %}
+          {% set status_class = 'status-wrong' %}
+          {% set badge_text = '❌ ' + sub.status %}
+          {% set badge_class = 'wrong' %}
+        {% endif %}
+      {% endif %}
+      <div class="q-item {{ status_class }} {% if loop.index0 == q_idx %}active{% endif %}"
+           onclick="switchQuestion({{ loop.index0 }})"
+           id="qitem-{{ loop.index0 }}">
+        <div class="q-num">{{ loop.index }}</div>
+        <div class="q-info">
+          <div class="q-title">{{ q.title }}</div>
+          <span class="q-badge {{ badge_class }}" id="qbadge-{{ loop.index0 }}">{{ badge_text }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="q-progress">
+      <span id="answered-count">0</span> / {{ questions|length }} <span data-i18n="answered">answered</span>
+      <div class="q-progress-bar"><div class="q-progress-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- Col 2: Question Content -->
+  <div class="q-panel">
+    {% if current_q %}
+    <div id="q-content">
+      <span class="badge badge-{{ current_q.difficulty|lower }}" style="margin-bottom:10px;display:inline-block">{{ current_q.difficulty|replace("Mudah","Easy")|replace("Sederhana","Medium")|replace("Susah","Hard") }}</span>
+      <h2 style="font-family:'Fraunces',serif;font-size:1.4rem;font-weight:900;color:#fff;margin-bottom:12px;line-height:1.2">{{ current_q.title }}</h2>
+      <p style="color:rgba(255,255,255,.82);font-size:0.9rem;line-height:1.7;margin-bottom:20px;white-space:pre-wrap">{{ current_q.description }}</p>
+
+      {% if current_q.input_format %}
+      <div style="margin-bottom:14px">
+        <div style="font-size:0.7rem;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:5px" data-i18n="input_format">Input Format</div>
+        <p style="color:rgba(255,255,255,.8);font-size:0.87rem;line-height:1.6">{{ current_q.input_format }}</p>
+      </div>
+      {% endif %}
+
+      {% if current_q.output_format %}
+      <div style="margin-bottom:14px">
+        <div style="font-size:0.7rem;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:5px" data-i18n="output_format">Output Format</div>
+        <p style="color:rgba(255,255,255,.8);font-size:0.87rem;line-height:1.6">{{ current_q.output_format }}</p>
+      </div>
+      {% endif %}
+
+      {% if current_q.sample_input or current_q.sample_output %}
+      <div style="background:rgba(255,255,255,.1);border-radius:12px;padding:14px;margin-bottom:14px">
+        {% if current_q.sample_input %}
+        <div style="margin-bottom:8px">
+          <div style="font-size:0.7rem;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:4px" data-i18n="sample_input">Sample Input</div>
+          <pre style="color:#E0E7FF;font-size:0.87rem;font-family:monospace;white-space:pre-wrap">{{ current_q.sample_input }}</pre>
+        </div>
+        {% endif %}
+        {% if current_q.sample_output %}
+        <div>
+          <div style="font-size:0.7rem;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:4px" data-i18n="sample_output">Sample Output</div>
+          <pre style="color:#E0E7FF;font-size:0.87rem;font-family:monospace;white-space:pre-wrap">{{ current_q.sample_output }}</pre>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div style="font-size:0.76rem;color:rgba(255,255,255,.5)">Time limit: {{ current_q.time_limit_sec }}s</div>
+    </div>
+    {% else %}
+    <p style="color:rgba(255,255,255,.7)">No questions in this session.</p>
+    {% endif %}
+  </div>
+
+  <!-- Col 3: Code Panel -->
+  <div class="code-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="section-title" id="editor-title">Code Editor</div>
+      <div style="font-size:0.8rem;color:var(--muted)" id="q-label">
+        {% if questions %}Question {{ q_idx + 1 }} / {{ questions|length }}{% endif %}
+      </div>
+    </div>
+
+    <div id="result-area"></div>
+
+    {% if attempt.status == 'IN_PROGRESS' %}
+    <div class="field" style="margin-bottom:14px">
+      <label data-i18n="language">Programming Language</label>
+      <select id="lang-select">
+        <option value="c++">C++ (GCC 10.2)</option>
+        <option value="python">Python 3.10</option>
+      </select>
+    </div>
+    <div class="field">
+      <label data-i18n="your_code">Your Code</label>
+      <textarea class="code-editor" id="code-editor" style="min-height:320px"
+        placeholder="#include &lt;iostream&gt;&#10;using namespace std;&#10;int main() {&#10;    return 0;&#10;}"></textarea>
+    </div>
+    <button class="btn btn-primary btn-full" id="submit-btn" onclick="submitCode()">
+      <span data-i18n="submit">Submit</span> →
+    </button>
+    {% else %}
+    <div class="alert alert-success" style="margin-bottom:18px">✅ This session has been completed.</div>
+    <div id="readonly-result"></div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+var QUESTIONS = {{ questions_json | safe }};
+var SUBMISSIONS = {{ submissions_json | safe }};
+var CURRENT_Q_IDX = {{ q_idx }};
+var SID = {{ sid }};
+var REMAINING = {{ remaining_seconds }};
+var SESSION_STATUS = "{{ attempt.status }}";
+
+// --- Timer ---
+var timerEl = document.getElementById('timer-display');
+function updateTimer() {
+  if (!timerEl || SESSION_STATUS !== 'IN_PROGRESS') return;
+  var m = Math.floor(REMAINING / 60);
+  var s = REMAINING % 60;
+  timerEl.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  if (REMAINING <= 300) timerEl.classList.add('warning');
+  if (REMAINING <= 60) { timerEl.classList.remove('warning'); timerEl.classList.add('danger'); }
+  if (REMAINING <= 0) { timerEl.textContent = '00:00'; autoSubmit(); return; }
+  REMAINING--;
+  setTimeout(updateTimer, 1000);
+}
+updateTimer();
+
+if (SESSION_STATUS === 'IN_PROGRESS') {
+  setInterval(function() {
+    fetch('/sessions/' + SID + '/time-remaining')
+      .then(r => r.json())
+      .then(d => { REMAINING = d.remaining_seconds; });
+  }, 30000);
+}
+
+function autoSubmit() {
+  if (SESSION_STATUS !== 'IN_PROGRESS') return;
+  alert('Time is up! Your answers will be submitted automatically.');
+  document.querySelector('form[action="/sessions/' + SID + '/finalize"]').submit();
+}
+
+// --- Progress counter ---
+function updateProgress() {
+  var answered = Object.keys(SUBMISSIONS).length;
+  var total = QUESTIONS.length;
+  var accepted = Object.values(SUBMISSIONS).filter(s => s.status === 'Accepted').length;
+  document.getElementById('answered-count').textContent = answered;
+  document.getElementById('progress-fill').style.width = (total ? (answered/total*100) : 0) + '%';
+  document.getElementById('progress-text').textContent = answered + '/' + total + ' attempted · ' + accepted + ' accepted';
+}
+updateProgress();
+
+// --- Question switching ---
+function switchQuestion(idx) {
+  CURRENT_Q_IDX = idx;
+  var q = QUESTIONS[idx];
+  if (!q) return;
+
+  // Update sidebar active state
+  document.querySelectorAll('.q-item').forEach(function(el, i) {
+    el.classList.toggle('active', i === idx);
+  });
+
+  // Update question content
+  var content = document.getElementById('q-content');
+  if (content) content.innerHTML = renderQuestion(q);
+
+  // Load code
+  var editor = document.getElementById('code-editor');
+  var sub = SUBMISSIONS[String(q.id)];
+  if (editor) {
+    editor.value = sub ? (sub.code || '') : (q.default_template || '');
+    if (sub && document.getElementById('lang-select'))
+      document.getElementById('lang-select').value = sub.language || 'c++';
+  }
+  showResult(q.id);
+  document.getElementById('q-label').textContent = 'Question ' + (idx+1) + ' / ' + QUESTIONS.length;
+}
+
+function renderQuestion(q) {
+  var html = '<span class="badge badge-' + (q.difficulty||'Easy').replace('Mudah','Easy').replace('Sederhana','Medium').replace('Susah','Hard').toLowerCase() + '" style="margin-bottom:10px;display:inline-block">' + (q.difficulty||'Easy').replace('Mudah','Easy').replace('Sederhana','Medium').replace('Susah','Hard') + '</span>';
+  html += '<h2 style="font-family:\'Fraunces\',serif;font-size:1.4rem;font-weight:900;color:#fff;margin-bottom:12px;line-height:1.2">' + q.title + '</h2>';
+  html += '<p style="color:rgba(255,255,255,.82);font-size:0.9rem;line-height:1.7;margin-bottom:20px;white-space:pre-wrap">' + q.description + '</p>';
+  if (q.input_format) html += '<div style="margin-bottom:14px"><div style="font-size:0.7rem;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:5px">Input Format</div><p style="color:rgba(255,255,255,.8);font-size:0.87rem;line-height:1.6">' + q.input_format + '</p></div>';
+  if (q.output_format) html += '<div style="margin-bottom:14px"><div style="font-size:0.7rem;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:5px">Output Format</div><p style="color:rgba(255,255,255,.8);font-size:0.87rem;line-height:1.6">' + q.output_format + '</p></div>';
+  if (q.sample_input || q.sample_output) {
+    html += '<div style="background:rgba(255,255,255,.1);border-radius:12px;padding:14px;margin-bottom:14px">';
+    if (q.sample_input) html += '<div style="margin-bottom:8px"><div style="font-size:0.7rem;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:4px">Sample Input</div><pre style="color:#E0E7FF;font-size:0.87rem;font-family:monospace;white-space:pre-wrap">' + q.sample_input + '</pre></div>';
+    if (q.sample_output) html += '<div><div style="font-size:0.7rem;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:4px">Sample Output</div><pre style="color:#E0E7FF;font-size:0.87rem;font-family:monospace;white-space:pre-wrap">' + q.sample_output + '</pre></div>';
+    html += '</div>';
+  }
+  html += '<div style="font-size:0.76rem;color:rgba(255,255,255,.5)">Time limit: ' + (q.time_limit_sec||5) + 's</div>';
+  return html;
+}
+
+function showResult(qid) {
+  var area = document.getElementById('result-area');
+  if (!area) return;
+  var sub = SUBMISSIONS[String(qid)];
+  if (!sub) { area.innerHTML = ''; return; }
+  var cls = sub.status === 'Accepted' ? 'result-accepted' : sub.status === 'Wrong Answer' ? 'result-wrong' : 'result-runtime';
+  var icon = sub.status === 'Accepted' ? '✅' : sub.status === 'Wrong Answer' ? '❌' : '⚠️';
+  area.innerHTML = '<div class="result-box ' + cls + '">' +
+    '<div class="result-title">' + icon + ' ' + sub.status + '</div>' +
+    '<div class="result-meta">' + (sub.passed||0) + '/' + (sub.total||0) + ' tests passed · ' + (sub.runtime_ms||0) + 'ms</div>' +
+    (sub.stdout ? '<div style="font-size:.78rem;font-weight:700;opacity:.7;margin-bottom:4px">Output:</div><div class="result-output">' + sub.stdout + '</div>' : '') +
+    (sub.stderr ? '<div style="font-size:.78rem;font-weight:700;margin:8px 0 4px;opacity:.7">Error:</div><div class="result-output" style="color:#991B1B">' + sub.stderr + '</div>' : '') +
+    '</div>';
+}
+
+// Init
+(function() {
+  var q = QUESTIONS[CURRENT_Q_IDX];
+  if (!q) return;
+  var editor = document.getElementById('code-editor');
+  var sub = SUBMISSIONS[String(q.id)];
+  if (editor) {
+    editor.value = sub ? (sub.code || '') : (q.default_template || '');
+    if (sub && document.getElementById('lang-select'))
+      document.getElementById('lang-select').value = sub.language || 'c++';
+  }
+  showResult(q.id);
+})();
+
+var langSel = document.getElementById('lang-select');
+if (langSel) {
+  langSel.addEventListener('change', function() {
+    var editor = document.getElementById('code-editor');
+    if (editor && !editor.value.trim()) {
+      var q = QUESTIONS[CURRENT_Q_IDX];
+      if (q && q.default_template) editor.value = q.default_template;
+      else if (this.value === 'c++') editor.value = '#include <iostream>\nusing namespace std;\nint main() {\n    return 0;\n}';
+      else editor.value = '# your code here\n';
+    }
+  });
+}
+
+function submitCode() {
+  var q = QUESTIONS[CURRENT_Q_IDX];
+  if (!q) return;
+  var code = document.getElementById('code-editor').value;
+  var lang = document.getElementById('lang-select').value;
+  var btn = document.getElementById('submit-btn');
+  btn.textContent = 'Processing...';
+  btn.disabled = true;
+
+  var fd = new FormData();
+  fd.append('question_id', q.id);
+  fd.append('code', code);
+  fd.append('language', lang);
+
+  fetch('/sessions/' + SID + '/submit', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(function(data) {
+      SUBMISSIONS[String(q.id)] = Object.assign({ code: code, language: lang }, data);
+      showResult(q.id);
+
+      // Update sidebar item
+      var item = document.getElementById('qitem-' + CURRENT_Q_IDX);
+      var badge = document.getElementById('qbadge-' + CURRENT_Q_IDX);
+      if (item) {
+        item.classList.remove('status-accepted','status-wrong','status-attempted');
+        if (data.status === 'Accepted') {
+          item.classList.add('status-accepted');
+          if (badge) { badge.className = 'q-badge accepted'; badge.textContent = '✅ Accepted'; }
+        } else {
+          item.classList.add('status-wrong');
+          if (badge) { badge.className = 'q-badge wrong'; badge.textContent = '❌ ' + data.status; }
+        }
+      }
+      updateProgress();
+    })
+    .catch(function(e) {
+      document.getElementById('result-area').innerHTML = '<div class="alert alert-error">Error: ' + e + '</div>';
+    })
+    .finally(function() {
+      btn.innerHTML = '<span data-i18n="submit">Submit</span> →';
+      applyI18n(localStorage.getItem('laboj_lang')||'en');
+      btn.disabled = false;
+    });
+}
+</script>
+{% endblock %}

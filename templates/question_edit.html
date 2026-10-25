@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Edit Question — Lab UTeM OJ{% endblock %}
+{% block extra_head %}
+<style>
+.admin-form{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;margin-bottom:24px}
+.admin-form h3{font-family:'Fraunces',serif;font-size:1.15rem;font-weight:700;margin-bottom:18px;color:var(--text)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+</style>
+{% endblock %}
+{% block body %}
+<div class="layout">
+  <div class="left-panel">
+    <div class="brand">
+      <div class="brand-badge">✦ Edit Question</div>
+      <h1>Question<br>Bank</h1>
+      <p>Update question details in the question bank.</p>
+    </div>
+    <div style="position:relative;z-index:1">
+      <div class="info-card" style="margin-bottom:10px">
+        <div class="lbl">Logged in as</div>
+        <div class="name">{{ user.full_name }}</div>
+        <div class="sub">Admin</div>
+      </div>
+      <div class="nav">
+        <a href="/admin#tab-questions" class="active"><span class="icon">⚙️</span> Admin</a>
+        <a href="/logout"><span class="icon">🚪</span> Log Out</a>
+      </div>
+    </div>
+  </div>
+  <div class="right-panel">
+    {% if msg %}<div class="alert alert-success">{{ msg }}</div>{% endif %}
+    {% if error %}<div class="alert alert-error">Ralat: {{ error }}</div>{% endif %}
+
+    <div class="section-header">
+      <div>
+        <div class="section-title">Edit Question #{{ q.id }}</div>
+        <div class="section-sub">Update Question</div>
+      </div>
+      <a href="/admin#tab-questions" class="btn btn-secondary btn-sm">← Back</a>
+    </div>
+
+    <div class="admin-form">
+      <form method="post" action="/admin/questions/{{ q.id }}/edit">
+        <div class="grid-2">
+          <div class="field">
+            <label>Title</label>
+            <input type="text" name="title" required value="{{ q.title }}">
+          </div>
+          <div class="grid-2" style="align-items:end">
+            <div class="field">
+              <label>Course Code</label>
+              <select name="course_code">
+                <option value="BITP1113" {% if q.course_code == 'BITP1113' %}selected{% endif %}>BITP1113</option>
+                <option value="DFDS1513" {% if q.course_code == 'DFDS1513' %}selected{% endif %}>DFDS1513</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Chapter</label>
+              <input type="number" name="chapter" value="{{ q.chapter }}" min="1" max="20">
+            </div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>Difficulty</label>
+            <select name="difficulty">
+              <option value="Mudah" {% if q.difficulty == 'Mudah' %}selected{% endif %}>Easy</option>
+              <option value="Sederhana" {% if q.difficulty == 'Sederhana' %}selected{% endif %}>Medium</option>
+              <option value="Susah" {% if q.difficulty == 'Susah' %}selected{% endif %}>Hard</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Time Limit (seconds)</label>
+            <input type="number" name="time_limit_sec" value="{{ q.time_limit_sec }}" step="0.5" min="1" max="30">
+          </div>
+        </div>
+        <div class="field">
+          <label>Question Description</label>
+          <textarea name="description" rows="4" required>{{ q.description }}</textarea>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>Input Format</label>
+            <textarea name="input_format" rows="2">{{ q.input_format }}</textarea>
+          </div>
+          <div class="field">
+            <label>Output Format</label>
+            <textarea name="output_format" rows="2">{{ q.output_format }}</textarea>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>Sample Input</label>
+            <textarea name="sample_input" rows="2">{{ q.sample_input }}</textarea>
+          </div>
+          <div class="field">
+            <label>Sample Output</label>
+            <textarea name="sample_output" rows="2">{{ q.sample_output }}</textarea>
+          </div>
+        </div>
+        <div class="field">
+          <label>Code Template (default C++)</label>
+          <textarea name="default_template" rows="6" class="code-editor" style="font-size:0.82rem;min-height:140px">{{ q.default_template }}</textarea>
+        </div>
+        <div class="field">
+          <label>Hidden Test Cases (JSON)</label>
+          <textarea name="hidden_tests" rows="4">{{ q.hidden_tests }}</textarea>
+          <div style="font-size:0.75rem;color:var(--muted);margin-top:4px">Format: [{"input": "...", "expected_output": "..."}]</div>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button type="submit" class="btn btn-primary" data-i18n="save">💾 Save</button>
+          <a href="/admin#tab-questions" class="btn btn-secondary" data-i18n="cancel">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

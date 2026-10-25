@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  lab-oj:
+    image: lab-oj
+    container_name: lab-oj
+    restart: unless-stopped
+    networks:
+      - proxy
+    volumes:
+      - /srv/homelab/app-data/lab-oj:/data
+    env_file: .env
+    ports:
+      - "8009:8000"
+
+networks:
+  proxy:
+    external: true

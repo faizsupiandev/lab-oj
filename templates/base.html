@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Lab UTeM OJ{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --indigo:#6366F1;--indigo-d:#4F46E5;--indigo-l:#EEF2FF;--indigo-xl:#F5F3FF;
+  --surface:#FFFFFF;--bg:#F8F7FF;--text:#1E1B4B;--muted:#6B7280;--border:#E5E7EB;
+  --success:#059669;--danger:#DC2626;--warning:#D97706;
+  --radius-lg:20px;--radius-md:14px;--radius-sm:8px;
+  --shadow-sm:0 2px 8px rgba(99,102,241,.10);--shadow-md:0 4px 20px rgba(99,102,241,.15);
+}
+html,body{height:100%;width:100%;background:var(--bg);color:var(--text);font-family:'Work Sans',system-ui,sans-serif}
+a{color:inherit;text-decoration:none}
+
+/* Layout */
+.layout{display:grid;grid-template-columns:1fr 1.4fr;min-height:100vh}
+.left-panel{background:var(--indigo);display:flex;flex-direction:column;justify-content:space-between;padding:44px 40px;position:relative;overflow:hidden;min-height:100vh;position:sticky;top:0;height:100vh}
+.left-panel::before{content:'';position:absolute;width:360px;height:360px;border-radius:50%;background:rgba(255,255,255,.08);top:-80px;right:-100px;pointer-events:none}
+.left-panel::after{content:'';position:absolute;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,.06);bottom:40px;left:-70px;pointer-events:none}
+.right-panel{background:var(--bg);padding:40px 48px;display:flex;flex-direction:column;overflow-y:auto}
+
+/* Brand */
+.brand{position:relative;z-index:1}
+.brand-badge{display:inline-block;background:rgba(255,255,255,.18);color:#fff;font-size:0.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:5px 14px;border-radius:20px;margin-bottom:18px}
+.brand h1{font-family:'Fraunces',serif;font-size:3rem;font-weight:900;color:#fff;line-height:1.05;margin-bottom:14px}
+.brand p{color:rgba(255,255,255,.72);font-size:1rem;line-height:1.6;max-width:270px}
+
+/* Nav */
+.nav{position:relative;z-index:1;display:flex;flex-direction:column;gap:6px;margin-top:32px}
+.nav a{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-md);color:rgba(255,255,255,.72);font-size:0.88rem;font-weight:600;transition:all .18s}
+.nav a:hover,.nav a.active{background:rgba(255,255,255,.18);color:#fff}
+.nav a .icon{font-size:1.1rem;flex-shrink:0}
+
+/* Card on left */
+.info-card{position:relative;z-index:1;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:var(--radius-lg);padding:20px 22px;backdrop-filter:blur(8px)}
+.info-card .lbl{font-size:0.72rem;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.info-card .name{font-family:'Fraunces',serif;font-size:1.15rem;font-weight:700;color:#fff;margin-bottom:3px}
+.info-card .sub{font-size:0.82rem;color:rgba(255,255,255,.62)}
+
+/* Form elements */
+.form-title{font-family:'Fraunces',serif;font-size:1.7rem;font-weight:700;color:var(--text);margin-bottom:4px}
+.form-subtitle{font-size:0.88rem;color:var(--muted);margin-bottom:28px}
+.field{margin-bottom:18px}
+.field label{display:block;font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px}
+input[type=text],input[type=password],input[type=number],select,textarea{
+  width:100%;padding:12px 16px;background:var(--surface);border:2px solid var(--border);
+  border-radius:var(--radius-md);color:var(--text);font-size:1rem;font-family:'Work Sans',sans-serif;
+  outline:none;transition:border-color .18s,box-shadow .18s}
+input[type=text]:focus,input[type=password]:focus,input[type=number]:focus,select:focus,textarea:focus{
+  border-color:var(--indigo);box-shadow:0 0 0 4px rgba(99,102,241,.10)}
+input::placeholder,textarea::placeholder{color:#C4C4D4}
+.upper{text-transform:uppercase}
+textarea{resize:vertical;min-height:80px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:12px 22px;border:none;border-radius:var(--radius-md);font-size:0.95rem;font-weight:700;font-family:'Work Sans',sans-serif;cursor:pointer;transition:all .18s;text-decoration:none}
+.btn-primary{background:var(--indigo);color:#fff;box-shadow:var(--shadow-sm)}
+.btn-primary:hover{background:var(--indigo-d);transform:translateY(-1px)}
+.btn-secondary{background:var(--surface);border:2px solid var(--border);color:var(--text)}
+.btn-secondary:hover{border-color:var(--indigo);color:var(--indigo)}
+.btn-danger{background:#FEE2E2;color:var(--danger);border:2px solid #FECACA}
+.btn-danger:hover{background:var(--danger);color:#fff}
+.btn-full{width:100%;justify-content:center;padding:14px}
+.btn-sm{padding:7px 14px;font-size:0.82rem}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;letter-spacing:.03em}
+.badge-mudah{background:#DCFCE7;color:#059669}
+.badge-sederhana{background:#FEF3C7;color:#D97706}
+.badge-susah{background:#FEE2E2;color:#DC2626}
+.badge-accepted{background:#DCFCE7;color:#059669}
+.badge-wrong{background:#FEE2E2;color:#DC2626}
+.badge-runtime{background:#FEF3C7;color:#D97706}
+.badge-tle{background:#E0E7FF;color:#4338CA}
+.badge-solved{background:var(--indigo-l);color:var(--indigo-d)}
+
+/* Alert */
+.alert{padding:12px 16px;border-radius:var(--radius-md);font-size:0.88rem;font-weight:500;margin-bottom:18px}
+.alert-error{background:#FEE2E2;color:#B91C1C;border:1px solid #FECACA}
+.alert-success{background:#DCFCE7;color:#065F46;border:1px solid #A7F3D0}
+.alert-info{background:var(--indigo-l);color:var(--indigo-d);border:1px solid #C7D2FE}
+
+/* Table */
+.table-wrap{border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;background:var(--surface)}
+table{width:100%;border-collapse:collapse}
+th{background:var(--indigo-l);color:var(--indigo-d);font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:12px 16px;text-align:left}
+td{padding:12px 16px;border-top:1px solid var(--border);font-size:0.9rem;vertical-align:middle}
+tr:hover td{background:#FAFAFA}
+tr.highlight td{background:var(--indigo-l)}
+
+/* Code editor */
+.code-editor{width:100%;padding:14px 16px;background:#1E1B4B;border:2px solid var(--border);border-radius:var(--radius-md);color:#E0E7FF;font-size:0.92rem;font-family:'Courier New',Courier,monospace;outline:none;resize:vertical;min-height:260px;transition:border-color .18s}
+.code-editor:focus{border-color:var(--indigo);box-shadow:0 0 0 4px rgba(99,102,241,.10)}
+
+/* Result box */
+.result-box{border-radius:var(--radius-md);padding:16px 20px;margin-top:18px;border:2px solid}
+.result-accepted{background:#DCFCE7;border-color:#6EE7B7;color:#065F46}
+.result-wrong{background:#FEE2E2;border-color:#FECACA;color:#991B1B}
+.result-runtime{background:#FEF3C7;border-color:#FDE68A;color:#92400E}
+.result-tle{background:#E0E7FF;border-color:#C7D2FE;color:#3730A3}
+.result-title{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700;margin-bottom:6px}
+.result-meta{font-size:0.82rem;opacity:.8;margin-bottom:8px}
+.result-output{font-family:monospace;font-size:0.85rem;background:rgba(0,0,0,.06);padding:8px 12px;border-radius:8px;white-space:pre-wrap;max-height:120px;overflow-y:auto}
+
+/* Section header */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.section-title{font-family:'Fraunces',serif;font-size:1.4rem;font-weight:700;color:var(--text)}
+.section-sub{font-size:0.85rem;color:var(--muted);margin-top:2px}
+
+/* Problem card */
+.problem-card{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:var(--surface);border:2px solid var(--border);border-radius:var(--radius-md);margin-bottom:10px;cursor:pointer;transition:all .18s;text-decoration:none;color:inherit}
+.problem-card:hover{border-color:var(--indigo);box-shadow:var(--shadow-sm);transform:translateX(3px)}
+.problem-card.solved{border-color:#6EE7B7}
+.problem-title-text{font-weight:700;font-size:1rem;margin-bottom:3px}
+.problem-meta{font-size:0.8rem;color:var(--muted)}
+
+/* Admin tabs */
+.tabs{display:flex;gap:4px;margin-bottom:28px;border-bottom:2px solid var(--border);padding-bottom:0}
+.tab-btn{padding:10px 20px;border:none;background:none;font-family:'Work Sans',sans-serif;font-size:0.9rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .18s}
+.tab-btn.active,.tab-btn:hover{color:var(--indigo);border-bottom-color:var(--indigo)}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+/* Responsive */
+@media(max-width:768px){
+  .layout{grid-template-columns:1fr}
+  .left-panel{min-height:auto;height:auto;position:static;padding:28px 24px}
+  .right-panel{padding:24px 20px}
+  .brand h1{font-size:2rem}
+}
+</style>
+{% block extra_head %}{% endblock %}
+<script>
+// i18n
+var I18N = {
+  en: {
+    questions: 'Questions', sessions: 'Sessions', leaderboard: 'Leaderboard',
+    logout: 'Logout', start_session: 'Start Session', submit: 'Submit',
+    time_remaining: 'Time Remaining', accepted: 'Accepted',
+    wrong_answer: 'Wrong Answer', runtime_error: 'Runtime Error',
+    question_bank: 'Question Bank', students: 'Students', submissions: 'Submissions',
+    add_question: 'Add Question', save: 'Save', cancel: 'Cancel',
+    edit: 'Edit', delete: 'Delete', password_label: 'Password (Phone Number)'
+  },
+  bm: {
+    questions: 'Questions', sessions: 'Sessions', leaderboard: 'Leaderboard',
+    logout: 'Log Out', start_session: 'Start Session', submit: 'Submit',
+    time_remaining: 'Masa Tinggal', accepted: 'Diterima',
+    wrong_answer: 'Jawapan Salah', runtime_error: 'Ralat Masa Larian',
+    question_bank: 'Question Bank', students: 'Student', submissions: 'Submissions',
+    add_question: 'Add Question', save: 'Save', cancel: 'Cancel',
+    edit: 'Edit', delete: 'Delete', password_label: 'Kata Laluan (Nombor Telefon)'
+  }
+};
+function applyI18n(lang) {
+  var t = I18N[lang] || I18N.en;
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    var key = el.getAttribute('data-i18n');
+    if (t[key]) el.textContent = t[key];
+  });
+  var toggleBtn = document.getElementById('lang-toggle');
+  if (toggleBtn) toggleBtn.textContent = lang === 'en' ? 'BM' : 'EN';
+  localStorage.setItem('laboj_lang', lang);
+}
+function toggleLang() {
+  var cur = localStorage.getItem('laboj_lang') || 'en';
+  applyI18n(cur === 'en' ? 'bm' : 'en');
+}
+document.addEventListener('DOMContentLoaded', function() {
+  var lang = localStorage.getItem('laboj_lang') || 'en';
+  applyI18n(lang);
+});
+</script>
+</head>
+<body>
+{% block body %}{% endblock %}
+</body>
+</html>

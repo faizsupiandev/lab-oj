@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard — Lab UTeM OJ{% endblock %}
+{% block body %}
+<div class="layout">
+  <div class="left-panel">
+    <div class="brand">
+      <div class="brand-badge">✦ Online Judge</div>
+      <h1>Leader<br>board</h1>
+      <p>Student rankings based on lab session scores.</p>
+    </div>
+    <div style="position:relative;z-index:1">
+      <div class="info-card" style="margin-bottom:10px">
+        <div class="lbl">You</div>
+        <div class="name">{{ user.matric_no }}</div>
+        {% if current_session %}
+        <div class="sub" style="margin-top:6px">{{ current_session.title }}</div>
+        <div class="sub">{{ current_session.course_code }}</div>
+        {% endif %}
+      </div>
+      <div class="nav">
+        {% if not user.is_admin %}
+        <a href="/sessions"><span class="icon">💻</span> Lab Sessions</a>
+        {% endif %}
+        <a href="/leaderboard" class="active"><span class="icon">🏆</span> Leaderboard</a>
+        {% if user.is_admin %}<a href="/admin"><span class="icon">⚙️</span> Admin</a>{% endif %}
+        <a href="/logout"><span class="icon">🚪</span> Log Out</a>
+      </div>
+    </div>
+  </div>
+  <div class="right-panel">
+    <div class="section-header">
+      <div>
+        <div class="section-title">Rankings</div>
+        <div class="section-sub">
+          {% if current_session %}{{ current_session.title }} · {{ current_session.course_code }}{% else %}No session selected{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Session selector + course filter -->
+    <form method="get" action="/leaderboard" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:flex-end">
+      {% if user.is_admin and all_courses %}
+      <div style="flex:0 0 auto">
+        <label style="display:block;font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">Course</label>
+        <select name="course_code" onchange="this.form.submit()" style="padding:10px 14px;border-radius:var(--radius-md);border:2px solid var(--border);font-size:0.9rem;background:var(--surface);min-width:160px">
+          <option value="">All Courses</option>
+          {% for cc in all_courses %}
+          <option value="{{ cc }}" {% if selected_course == cc %}selected{% endif %}>{{ cc }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      {% if available_sessions %}
+      <div style="flex:1;min-width:200px">
+        <label style="display:block;font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">Session</label>
+        <select name="session_id" onchange="this.form.submit()" style="width:100%;padding:10px 14px;border-radius:var(--radius-md);border:2px solid var(--border);font-size:0.9rem;background:var(--surface)">
+          {% for s in available_sessions %}
+          <option value="{{ s.id }}" {% if current_session and current_session.id == s.id %}selected{% endif %}>
+            {{ s.title }} ({{ s.course_code }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if user.is_admin and selected_course %}
+      <input type="hidden" name="course_code" value="{{ selected_course }}">
+      {% endif %}
+      {% endif %}
+    </form>
+
+    {% if not available_sessions %}
+    <div style="text-align:center;padding:48px 24px;color:var(--muted)">
+      <div style="font-size:2.5rem;margin-bottom:12px">🏆</div>
+      <div style="font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700;margin-bottom:8px">No Sessions Yet</div>
+      <div style="font-size:0.9rem">
+        {% if user.is_admin %}Create a lab session from the admin panel.{% else %}Join a lab session to view the leaderboard.{% endif %}
+      </div>
+    </div>
+    {% elif not entries %}
+    <div style="text-align:center;padding:48px 24px;color:var(--muted)">
+      <div style="font-size:2.5rem;margin-bottom:12px">📊</div>
+      <div style="font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700;margin-bottom:8px">No Data Yet</div>
+      <div style="font-size:0.9rem">No submissions for this session yet.</div>
+    </div>
+    {% else %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:60px">#</th>
+            <th>Matric No.</th>
+            <th style="text-align:center">Score</th>
+            <th style="text-align:center">Time</th>
+            <th style="text-align:center">Attempts</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in entries %}
+          <tr class="{% if e.matric_no == user.matric_no %}highlight{% endif %}">
+            <td style="font-family:'Fraunces',serif;font-weight:700;font-size:1.1rem;color:var(--indigo)">
+              {% if e.rank == 1 %}🥇
+              {% elif e.rank == 2 %}🥈
+              {% elif e.rank == 3 %}🥉
+              {% else %}{{ e.rank }}{% endif %}
+            </td>
+            <td style="font-weight:600">
+              {{ e.matric_no }}
+              {% if e.matric_no == user.matric_no %}<span class="badge badge-solved" style="margin-left:6px;font-size:0.7rem">You</span>{% endif %}
+            </td>
+            <td style="text-align:center;font-weight:700;color:var(--indigo)">{{ e.score_display }}</td>
+            <td style="text-align:center;font-family:monospace;font-size:0.9rem">{{ e.time_display }}</td>
+            <td style="text-align:center">
+              <span class="badge badge-solved">{{ e.total_attempts }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;font-size:0.8rem;color:var(--muted)">
+      {{ entries|length }} students · Sorted by: highest score, fastest time, fewest attempts
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Login — Lab UTeM OJ{% endblock %}
+{% block body %}
+<div class="layout">
+  <div class="left-panel" style="position:relative">
+    <button class="lang-btn-login" id="lang-toggle" onclick="toggleLang()" style="position:absolute;top:12px;right:16px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:4px 12px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;z-index:10">BM</button>
+    <div class="brand">
+      <div class="brand-badge">✦ Online Judge</div>
+      <h1>Lab<br>UTeM</h1>
+      <p>Automated code assessment platform for UTeM students.</p>
+    </div>
+    <div class="info-card">
+      <div class="lbl">Sistem</div>
+      <div class="name">Automated Assessment</div>
+      <div class="sub">Submit code • Get instant results</div>
+    </div>
+  </div>
+  <div class="right-panel" style="justify-content:center">
+    <div style="max-width:420px;width:100%;margin:auto">
+      <div class="form-title">Login</div>
+      <div class="form-subtitle">Enter your credentials to access the system</div>
+
+      {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="/">
+        <div class="field">
+          <label>Matric No.</label>
+          <input type="text" name="matric" class="upper" placeholder="e.g. B012345678" autocomplete="off" required>
+        </div>
+        <div class="field">
+          <label id="pw-label" data-i18n="password_label">Password (Phone Number)</label>
+          <input type="password" name="phone" placeholder="Password (Phone Number)" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" style="margin-top:8px">
+          Login →
+        </button>
+      </form>
+
+      <p style="margin-top:24px;font-size:0.8rem;color:var(--muted);text-align:center">
+        Contact your lecturer if you have trouble logging in.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

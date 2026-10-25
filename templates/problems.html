@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Question List — Lab UTeM OJ{% endblock %}
+{% block body %}
+<div class="layout">
+  <div class="left-panel">
+    <div class="brand">
+      <div class="brand-badge">✦ Online Judge</div>
+      <h1>Question<br>List</h1>
+      <p>Select a question, write your code, and submit for automated grading.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;position:relative;z-index:1">
+      <div class="info-card">
+        <div class="lbl">Student</div>
+        <div class="name">{{ user.full_name }}</div>
+        <div class="sub">{{ user.matric_no }}</div>
+      </div>
+      <div class="nav">
+        <a href="/problems" class="active"><span class="icon">📝</span> Questions</a>
+        <a href="/leaderboard"><span class="icon">🏆</span> Leaderboard</a>
+        {% if user.is_admin %}<a href="/admin"><span class="icon">⚙️</span> Admin</a>{% endif %}
+        <a href="/logout"><span class="icon">🚪</span> Log Out</a>
+      </div>
+    </div>
+  </div>
+  <div class="right-panel">
+    <div class="section-header">
+      <div>
+        <div class="section-title">All Questions</div>
+        <div class="section-sub">{{ problems|length }} question(s) available</div>
+      </div>
+    </div>
+
+    {% if not problems %}
+    <div class="alert alert-info">No questions available at this time.</div>
+    {% endif %}
+
+    {% for p in problems %}
+    <a href="/problems/{{ p.id }}" class="problem-card {% if p.id in solved_ids %}solved{% endif %}">
+      <div>
+        <div class="problem-title-text">
+          {{ p.title }}
+          {% if p.id in solved_ids %}<span style="color:var(--success);font-size:0.85rem">✓</span>{% endif %}
+        </div>
+        <div class="problem-meta">
+          Question #{{ p.id }}
+          {% if p.time_limit_sec %} · Masa: {{ p.time_limit_sec }}s{% endif %}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        {% if p.id in solved_ids %}
+        <span class="badge badge-solved">Completed ✓</span>
+        {% endif %}
+        <span class="badge badge-{{ p.difficulty|lower }}">{{ p.difficulty }}</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

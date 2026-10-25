@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Session Lab — Lab UTeM OJ{% endblock %}
+{% block extra_head %}
+<style>
+.session-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius-lg);padding:24px 28px;margin-bottom:16px;transition:all .18s}
+.session-card:hover{border-color:var(--indigo);box-shadow:var(--shadow-md)}
+.session-card.open{border-color:#6EE7B7}
+.session-card.closed{opacity:.75}
+.session-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:0.82rem;color:var(--muted)}
+.session-meta span{display:flex;align-items:center;gap:4px}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius-lg);padding:36px 40px;max-width:460px;width:100%;box-shadow:0 8px 40px rgba(99,102,241,.22)}
+.modal h2{font-family:'Fraunces',serif;font-size:1.4rem;font-weight:700;margin-bottom:12px}
+.modal p{font-size:0.9rem;color:var(--muted);line-height:1.6;margin-bottom:24px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end}
+</style>
+{% endblock %}
+{% block body %}
+<div class="layout">
+  <div class="left-panel" style="position:relative">
+    <button id="lang-toggle" onclick="toggleLang()" style="position:absolute;top:12px;right:16px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:4px 12px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;z-index:10">BM</button>
+    <div class="brand">
+      <div class="brand-badge">✦ Online Judge</div>
+      <h1>Session<br>Lab</h1>
+      <p>Select an active session and begin your timed assessment.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;position:relative;z-index:1">
+      <div class="info-card">
+        <div class="lbl">Student</div>
+        <div class="name">{{ user.full_name }}</div>
+        <div class="sub">{{ user.matric_no }}</div>
+      </div>
+      <div class="nav">
+        <a href="/sessions" class="active"><span class="icon">🖥️</span> <span data-i18n="sessions">Sessions</span></a>
+        <a href="/leaderboard"><span class="icon">🏆</span> <span data-i18n="leaderboard">Leaderboard</span></a>
+        <a href="/logout"><span class="icon">🚪</span> <span data-i18n="logout">Logout</span></a>
+      </div>
+    </div>
+  </div>
+  <div class="right-panel">
+    {% if error == 'window_closed' %}
+    <div class="alert alert-error">This session is not currently open. Please try during the active time window.</div>
+    {% endif %}
+
+    <div class="section-header">
+      <div>
+        <div class="section-title">Active Lab Sessions</div>
+        <div class="section-sub">{{ sessions|length }} session(s) available</div>
+      </div>
+    </div>
+
+    {% if not sessions %}
+    <div class="alert alert-info">No active lab sessions at the moment. Please wait for your lecturer.</div>
+    {% endif %}
+
+    {% for s in sessions %}
+    <div class="session-card {% if s.window_open %}open{% else %}closed{% endif %}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            {% if s.window_open %}
+            <span class="badge badge-accepted">🟢 Open</span>
+            {% else %}
+            <span class="badge badge-wrong">🔴 Closed</span>
+            {% endif %}
+            <span style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">{{ s.course_code }}</span>
+          </div>
+          <div style="font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700;color:var(--text);margin-bottom:4px">{{ s.title }}</div>
+          <div class="session-meta">
+            <span>🕐 Start: {{ s.window_start }}</span>
+            <span>🕕 End: {{ s.window_end }}</span>
+            <span>⏱ Duration: {{ s.duration_minutes }} minutes</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+          {% if s.student_status == 'NOT_STARTED' %}
+            {% if s.window_open %}
+            <button class="btn btn-primary" onclick="openModal({{ s.id }}, '{{ s.title }}', {{ s.duration_minutes }})">
+              <span data-i18n="start_session">Start Session</span> →
+            </button>
+            {% else %}
+            <button class="btn btn-secondary" disabled>Not Yet Open</button>
+            {% endif %}
+          {% elif s.student_status == 'IN_PROGRESS' %}
+          <a href="/sessions/{{ s.id }}/attempt" class="btn btn-primary">⏱ Sambung →</a>
+          <span class="badge badge-runtime">Sedang Berjalan</span>
+          {% else %}
+          <a href="/sessions/{{ s.id }}/attempt" class="btn btn-secondary">Lihat Keputusan</a>
+          <span class="badge badge-accepted">✓ Completed</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal-overlay" id="start-modal">
+  <div class="modal">
+    <h2>Start Session?</h2>
+    <p id="modal-msg">Once you press <strong>Start</strong>, your timer will begin and cannot be paused.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <form id="start-form" method="post" style="display:inline">
+        <button type="submit" class="btn btn-primary">Start Now →</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function openModal(sid, title, duration) {
+  document.getElementById('modal-msg').innerHTML =
+    'Session: <strong>' + title + '</strong><br>Duration: <strong>' + duration + ' minutes</strong><br><br>Once you press <strong>Start</strong>, the timer will begin and cannot be paused.';
+  document.getElementById('start-form').action = '/sessions/' + sid + '/start';
+  document.getElementById('start-modal').classList.add('show');
+}
+function closeModal() {
+  document.getElementById('start-modal').classList.remove('show');
+}
+</script>
+{% endblock %}
