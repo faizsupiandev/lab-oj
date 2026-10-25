@@ -136,16 +136,18 @@
               <th>Course</th>
               <th>Ch</th>
               <th>Difficulty</th>
+              <th>Preview</th>
               <th>Add</th>
             </tr>
           </thead>
           <tbody>
             {% for q in all_questions %}
-            <tr data-title="{{ q.title|lower }}" data-course="{{ q.course_code }}" data-chapter="{{ q.chapter }}">
+            <tr data-title="{{ q.title|lower }}" data-course="{{ q.course_code }}" data-chapter="{{ q.chapter }}" data-desc="{{ (q.description or '')|e }}">
               <td>{{ q.title }}</td>
               <td><span class="badge badge-course">{{ q.course_code }}</span></td>
               <td>{{ q.chapter }}</td>
               <td><span class="badge badge-{{ q.difficulty|lower }}">{{ q.difficulty|replace("Mudah","Easy")|replace("Sederhana","Medium")|replace("Susah","Hard") }}</span></td>
+              <td><button type="button" class="btn-preview-sm" onclick="togglePreview(this)">👁</button></td>
               <td>
                 <form method="POST" action="/admin/sessions/{{ session.id }}/add-question">
                   <input type="hidden" name="question_id" value="{{ q.id }}">
@@ -211,6 +213,10 @@
   padding:4px 12px; background:#dcfce7; color:#16a34a;
   border:none; border-radius:6px; font-size:.8rem; cursor:pointer; font-weight:600;
 }
+.btn-preview-sm {
+  padding:4px 10px; background:#EEF2FF; color:#4F46E5;
+  border:none; border-radius:6px; font-size:.85rem; cursor:pointer;
+}
 .data-table { width:100%; border-collapse:collapse; font-size:.85rem; }
 .data-table th { text-align:left; padding:10px 12px; border-bottom:2px solid var(--border,#e5e7eb); font-size:.72rem; letter-spacing:.07em; color:var(--muted,#888); font-weight:700; }
 .data-table td { padding:10px 12px; border-bottom:1px solid var(--border,#f0f0f0); }
@@ -231,7 +237,7 @@ function filterQuestions() {
   const search = document.getElementById('qSearch').value.toLowerCase();
   const course = document.getElementById('qCourse').value;
   const chapter = document.getElementById('qChapter').value;
-  document.querySelectorAll('#qTable tbody tr').forEach(row => {
+  document.querySelectorAll('#qTable tbody tr:not(.preview-row)').forEach(row => {
     const title = row.dataset.title || '';
     const rc = row.dataset.course || '';
     const rch = row.dataset.chapter || '';
@@ -239,7 +245,24 @@ function filterQuestions() {
               && (!course || rc === course)
               && (!chapter || rch === chapter);
     row.style.display = show ? '' : 'none';
+    // Hide preview rows too
+    const next = row.nextElementSibling;
+    if (next && next.classList.contains('preview-row')) next.style.display = show ? '' : 'none';
   });
+}
+
+function togglePreview(btn) {
+  var row = btn.closest('tr');
+  var next = row.nextElementSibling;
+  if (next && next.classList.contains('preview-row')) {
+    next.remove(); btn.textContent = '👁';
+  } else {
+    var desc = row.dataset.desc || 'No description.';
+    var tr = document.createElement('tr');
+    tr.className = 'preview-row';
+    tr.innerHTML = '<td colspan="6" style="background:#EEF2FF;padding:12px 20px;font-size:.88rem;color:#3730a3;border-bottom:1px solid #C7D2FE;"><b>Description:</b> ' + desc + '</td>';
+    row.after(tr); btn.textContent = '✕';
+  }
 }
 </script>
 {% endblock body %}

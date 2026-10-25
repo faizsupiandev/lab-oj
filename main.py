@@ -1,5 +1,7 @@
 import os
 import asyncio
+import csv
+import io
 import sqlite3
 import hashlib
 import json
@@ -20,7 +22,7 @@ from typing import Optional
 
 import pymysql
 from fastapi import FastAPI, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
@@ -38,6 +40,15 @@ ADMIN_PASS   = "Ad@lah77"
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+
+def format_myt(dt_str):
+    if not dt_str: return '-'
+    try:
+        dt = datetime.fromisoformat(str(dt_str))
+        return dt.strftime('%-d %b %Y, %I:%M %p')
+    except:
+        return str(dt_str)
+templates.env.filters['myt'] = format_myt
 try:
     app.mount("/static", StaticFiles(directory="static"), name="static")
 except Exception:
@@ -1283,7 +1294,7 @@ async def admin_session_edit_get(request: Request, sid: int):
     assigned_ids = set(q["id"] for q in assigned)
     # All questions not yet in this session
     all_q_rows = conn.execute(
-        "SELECT id, title, course_code, chapter, difficulty FROM question_bank ORDER BY course_code, chapter, id"
+        "SELECT id, title, course_code, chapter, difficulty, description FROM question_bank ORDER BY course_code, chapter, id"
     ).fetchall()
     all_questions = [dict(q) for q in all_q_rows if q["id"] not in assigned_ids]
     conn.close()
@@ -1314,6 +1325,142 @@ async def admin_session_edit_post(
     return RedirectResponse(f"/admin/sessions/{sid}/edit", status_code=302)
 
 
+# ─── Admin Report ──────────────────────────────────────────────────────────────
+
+@app.get("/admin/report", response_class=HTMLResponse)
+async def admin_report(request: Request, session_id: int = None):
+    user = get_current_user(request)
+    if not user or not user["is_admin"]:
+        return RedirectResponse("/", status_code=302)
+    conn = get_db()
+    sessions = [dict(s) for s in conn.execute(
+        "SELECT * FROM lab_sessions ORDER BY created_at DESC"
+    ).fetchall()]
+    report_data = None
+    current_session = None
+    sid = session_id or (sessions[0]["id"] if sessions else None)
+    if sid:
+        current_session = next((s for s in sessions if s["id"] == sid), None)
+    if current_session:
+        questions = [dict(q) for q in conn.execute("""
+            SELECT qb.id, qb.title, qb.chapter, qb.difficulty
+            FROM session_questions sq JOIN question_bank qb ON sq.question_id=qb.id
+            WHERE sq.session_id=? ORDER BY sq.question_order
+        """, (current_session["id"],)).fetchall()]
+        students = [dict(s) for s in conn.execute(
+            "SELECT DISTINCT matric_no, started_at, status FROM student_session_attempts WHERE session_id=? ORDER BY matric_no",
+            (current_session["id"],)
+        ).fetchall()]
+        matrix = {}
+        for st in students:
+            matric = st["matric_no"]
+            matrix[matric] = {}
+            for q in questions:
+                best = conn.execute("""
+                    SELECT MAX(CAST(passed AS REAL)/CASE WHEN total=0 THEN 1 ELSE total END * 100)
+                    FROM session_submissions WHERE matric_no=? AND session_id=? AND question_id=?
+                """, (matric, current_session["id"], q["id"])).fetchone()[0]
+                matrix[matric][q["id"]] = round(best, 1) if best is not None else None
+        q_stats = {}
+        for q in questions:
+            attempted = conn.execute(
+                "SELECT COUNT(DISTINCT matric_no) FROM session_submissions WHERE session_id=? AND question_id=?",
+                (current_session["id"], q["id"])
+            ).fetchone()[0]
+            passed_count = conn.execute("""
+                SELECT COUNT(DISTINCT matric_no) FROM (
+                    SELECT matric_no FROM session_submissions
+                    WHERE session_id=? AND question_id=? AND passed=total AND total>0
+                    GROUP BY matric_no
+                )
+            """, (current_session["id"], q["id"])).fetchone()[0]
+            q_stats[str(q["id"])] = {"attempted": attempted, "passed": passed_count}
+        total_students = len(students)
+        scores = []
+        totals = {}  # matric -> total score
+        for st in students:
+            matric = st["matric_no"]
+            t = sum(v for v in matrix[matric].values() if v is not None)
+            totals[matric] = round(t, 1)
+            scores.append(t)
+        avg_score = round(sum(scores) / len(scores), 1) if scores else 0
+        max_possible = len(questions) * 100
+        full_marks = sum(1 for s in scores if s >= max_possible) if max_possible else 0
+        report_data = {
+            "questions": questions, "students": students, "matrix": matrix,
+            "q_stats": q_stats, "total_students": total_students,
+            "avg_score": avg_score, "max_possible": max_possible,
+            "full_marks": full_marks, "totals": totals,
+        }
+    conn.close()
+    return templates.TemplateResponse(request, "report.html", {
+        "user": user, "sessions": sessions, "current_session": current_session,
+        "report_data": report_data, "selected_sid": sid,
+    })
+
+
+@app.get("/admin/report/export-csv")
+async def export_report_csv(request: Request, session_id: int):
+    user = get_current_user(request)
+    if not user or not user["is_admin"]:
+        return RedirectResponse("/", status_code=302)
+    conn = get_db()
+    session = dict(conn.execute("SELECT * FROM lab_sessions WHERE id=?", (session_id,)).fetchone())
+    questions = [dict(q) for q in conn.execute("""
+        SELECT qb.id, qb.title FROM session_questions sq
+        JOIN question_bank qb ON sq.question_id=qb.id
+        WHERE sq.session_id=? ORDER BY sq.question_order
+    """, (session_id,)).fetchall()]
+    students = [dict(s) for s in conn.execute(
+        "SELECT DISTINCT matric_no FROM student_session_attempts WHERE session_id=? ORDER BY matric_no",
+        (session_id,)
+    ).fetchall()]
+    output = io.StringIO()
+    writer = csv.writer(output)
+    header = ["Matric No"] + [f"Q{i+1}: {q['title'][:25]}" for i, q in enumerate(questions)] + ["Total", "Max"]
+    writer.writerow(header)
+    max_score = len(questions) * 100
+    for st in students:
+        matric = st["matric_no"]
+        row = [matric]
+        total = 0
+        for q in questions:
+            best = conn.execute("""
+                SELECT MAX(CAST(passed AS REAL)/CASE WHEN total=0 THEN 1 ELSE total END * 100)
+                FROM session_submissions WHERE matric_no=? AND session_id=? AND question_id=?
+            """, (matric, session_id, q["id"])).fetchone()[0]
+            score = round(best, 1) if best is not None else 0
+            total += score
+            row.append(score)
+        row.extend([round(total, 1), max_score])
+        writer.writerow(row)
+    conn.close()
+    output.seek(0)
+    safe_title = session["title"].replace(" ", "_").replace("/", "-")
+    filename = f"report_{safe_title}_{session_id}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.get("/admin/submissions/{sub_id}", response_class=HTMLResponse)
+async def admin_submission_detail(request: Request, sub_id: int):
+    user = get_current_user(request)
+    if not user or not user["is_admin"]:
+        return RedirectResponse("/", status_code=302)
+    conn = get_db()
+    sub = conn.execute("SELECT * FROM session_submissions WHERE id=?", (sub_id,)).fetchone()
+    if not sub:
+        conn.close()
+        raise HTTPException(404, "Submission not found")
+    sub = dict(sub)
+    q = conn.execute("SELECT title FROM question_bank WHERE id=?", (sub["question_id"],)).fetchone()
+    sess = conn.execute("SELECT title FROM lab_sessions WHERE id=?", (sub["session_id"],)).fetchone()
+    sub["question_title"] = q["title"] if q else "Unknown"
+    sub["session_title"] = sess["title"] if sess else "Unknown"
+    conn.close()
+    return templates.TemplateResponse(request, "submission_detail.html", {"user": user, "sub": sub})
 
 
 @app.on_event("startup")

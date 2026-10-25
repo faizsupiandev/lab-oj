@@ -19,7 +19,7 @@
 {% block body %}
 <div class="layout">
   <div class="left-panel" style="position:relative">
-    <button id="lang-toggle" onclick="toggleLang()" style="position:absolute;top:12px;right:16px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:4px 12px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;z-index:10">BM</button>
+    
     <div class="brand">
       <div class="brand-badge">✦ Online Judge</div>
       <h1>Session<br>Lab</h1>
@@ -68,8 +68,8 @@
           </div>
           <div style="font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700;color:var(--text);margin-bottom:4px">{{ s.title }}</div>
           <div class="session-meta">
-            <span>🕐 Start: {{ s.window_start }}</span>
-            <span>🕕 End: {{ s.window_end }}</span>
+            <span>🕐 Start: {{ s.window_start | myt }}</span>
+            <span>🕕 End: {{ s.window_end | myt }}</span>
             <span>⏱ Duration: {{ s.duration_minutes }} minutes</span>
           </div>
         </div>

@@ -8,14 +8,14 @@
 .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 .session-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px 20px;margin-bottom:10px}
 .session-row-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.lang-btn{position:absolute;top:12px;right:16px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:4px 12px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;z-index:10}
-.lang-btn:hover{background:rgba(255,255,255,.3)}
+
+
 </style>
 {% endblock %}
 {% block body %}
 <div class="layout">
   <div class="left-panel" style="position:relative">
-    <button class="lang-btn" id="lang-toggle" onclick="toggleLang()">BM</button>
+    
     <div class="brand">
       <div class="brand-badge">✦ Admin</div>
       <h1>Admin<br>Panel</h1>
@@ -40,10 +40,11 @@
     {% if error %}<div class="alert alert-error">Ralat: {{ error }}</div>{% endif %}
 
     <div class="tabs" id="admin-tabs">
-      <button class="tab-btn active" onclick="switchTab('sessions', this)">🖥️ <span data-i18n="sessions">Sessions</span> ({{ sessions|length }})</button>
-      <button class="tab-btn" onclick="switchTab('questions', this)">🗂️ <span data-i18n="questions">Questions</span> ({{ questions|length }})</button>
-      <button class="tab-btn" onclick="switchTab('students', this)">👥 <span data-i18n="students">Students</span> ({{ students|length }})</button>
-      <button class="tab-btn" onclick="switchTab('submissions', this)">📨 <span data-i18n="submissions">Submissions</span> ({{ submissions|length }})</button>
+      <button class="tab-btn active" onclick="switchTab('sessions', this)">🖥️ Sessions ({{ sessions|length }})</button>
+      <button class="tab-btn" onclick="switchTab('questions', this)">🗂️ Questions ({{ questions|length }})</button>
+      <button class="tab-btn" onclick="switchTab('students', this)">👥 Students ({{ students|length }})</button>
+      <button class="tab-btn" onclick="switchTab('submissions', this)">📨 Submissions ({{ submissions|length }})</button>
+      <a href="/admin/report" class="tab-btn" style="text-decoration:none;">📊 Report</a>
     </div>
 
     <!-- Sessions Tab -->
@@ -89,7 +90,7 @@
         <div class="session-row-head">
           <div>
             <div style="font-family:'Fraunces',serif;font-size:1.05rem;font-weight:700;margin-bottom:2px">{{ s.title }}</div>
-            <div style="font-size:0.8rem;color:var(--muted)">{{ s.course_code }} · {{ s.window_start }} → {{ s.window_end }} · {{ s.duration_minutes }} min</div>
+            <div style="font-size:0.8rem;color:var(--muted)">{{ s.course_code }} · {{ s.window_start | myt }} → {{ s.window_end | myt }} · {{ s.duration_minutes }} min</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
             {% if s.is_active %}<span class="badge badge-accepted">Active</span>
@@ -301,7 +302,7 @@
         <table>
           <thead>
             <tr>
-              <th>#</th><th>Student</th><th>Question</th><th>Language</th><th>Status</th><th>Time</th><th>Date</th>
+              <th>#</th><th>Student</th><th>Question</th><th>Language</th><th>Status</th><th>Score</th><th>Time</th><th>Date</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -319,8 +320,10 @@
                   {{ s.status }}
                 </span>
               </td>
+              <td style="font-size:0.82rem;font-weight:600;">{{ s.passed }}/{{ s.total }}</td>
               <td style="font-size:0.85rem">{{ s.runtime_ms }}ms</td>
               <td style="font-size:0.78rem;color:var(--muted)">{{ s.created_at }}</td>
+              <td><a href="/admin/submissions/{{ s.id }}" style="padding:4px 10px;background:#EEF2FF;color:#4F46E5;border-radius:6px;font-size:.78rem;font-weight:700;text-decoration:none;">View</a></td>
             </tr>
             {% endfor %}
           </tbody>

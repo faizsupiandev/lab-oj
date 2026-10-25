@@ -137,45 +137,7 @@ tr.highlight td{background:var(--indigo-l)}
 </style>
 {% block extra_head %}{% endblock %}
 <script>
-// i18n
-var I18N = {
-  en: {
-    questions: 'Questions', sessions: 'Sessions', leaderboard: 'Leaderboard',
-    logout: 'Logout', start_session: 'Start Session', submit: 'Submit',
-    time_remaining: 'Time Remaining', accepted: 'Accepted',
-    wrong_answer: 'Wrong Answer', runtime_error: 'Runtime Error',
-    question_bank: 'Question Bank', students: 'Students', submissions: 'Submissions',
-    add_question: 'Add Question', save: 'Save', cancel: 'Cancel',
-    edit: 'Edit', delete: 'Delete', password_label: 'Password (Phone Number)'
-  },
-  bm: {
-    questions: 'Questions', sessions: 'Sessions', leaderboard: 'Leaderboard',
-    logout: 'Log Out', start_session: 'Start Session', submit: 'Submit',
-    time_remaining: 'Masa Tinggal', accepted: 'Diterima',
-    wrong_answer: 'Jawapan Salah', runtime_error: 'Ralat Masa Larian',
-    question_bank: 'Question Bank', students: 'Student', submissions: 'Submissions',
-    add_question: 'Add Question', save: 'Save', cancel: 'Cancel',
-    edit: 'Edit', delete: 'Delete', password_label: 'Kata Laluan (Nombor Telefon)'
-  }
-};
-function applyI18n(lang) {
-  var t = I18N[lang] || I18N.en;
-  document.querySelectorAll('[data-i18n]').forEach(function(el) {
-    var key = el.getAttribute('data-i18n');
-    if (t[key]) el.textContent = t[key];
-  });
-  var toggleBtn = document.getElementById('lang-toggle');
-  if (toggleBtn) toggleBtn.textContent = lang === 'en' ? 'BM' : 'EN';
-  localStorage.setItem('laboj_lang', lang);
-}
-function toggleLang() {
-  var cur = localStorage.getItem('laboj_lang') || 'en';
-  applyI18n(cur === 'en' ? 'bm' : 'en');
-}
-document.addEventListener('DOMContentLoaded', function() {
-  var lang = localStorage.getItem('laboj_lang') || 'en';
-  applyI18n(lang);
-});
+// No i18n — English only
 </script>
 </head>
 <body>

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Submission #{{ sub.id }} — Lab OJ{% endblock %}
+{% block body %}
+<div style="max-width:900px;margin:40px auto;padding:0 24px;font-family:'Work Sans',sans-serif;">
+
+  <a href="/admin" style="display:inline-flex;align-items:center;gap:6px;color:#6B7280;font-size:.88rem;margin-bottom:24px;text-decoration:none;">← Back to Admin</a>
+
+  <h1 style="font-family:'Fraunces',serif;font-size:1.8rem;font-weight:900;color:#1E1B4B;margin-bottom:4px;">Submission #{{ sub.id }}</h1>
+  <div style="color:#6B7280;font-size:.9rem;margin-bottom:28px;">{{ sub.created_at }}</div>
+
+  <!-- Meta info -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:28px;">
+    <div style="background:#F5F3FF;border-radius:12px;padding:16px;">
+      <div style="font-size:.68rem;font-weight:700;color:#6B7280;letter-spacing:.07em;margin-bottom:4px;">STUDENT</div>
+      <div style="font-weight:700;color:#1E1B4B;">{{ sub.matric_no }}</div>
+    </div>
+    <div style="background:#F5F3FF;border-radius:12px;padding:16px;">
+      <div style="font-size:.68rem;font-weight:700;color:#6B7280;letter-spacing:.07em;margin-bottom:4px;">SESSION</div>
+      <div style="font-weight:700;color:#1E1B4B;">{{ sub.session_title }}</div>
+    </div>
+    <div style="background:#F5F3FF;border-radius:12px;padding:16px;">
+      <div style="font-size:.68rem;font-weight:700;color:#6B7280;letter-spacing:.07em;margin-bottom:4px;">QUESTION</div>
+      <div style="font-weight:700;color:#1E1B4B;">{{ sub.question_title }}</div>
+    </div>
+    <div style="background:#F5F3FF;border-radius:12px;padding:16px;">
+      <div style="font-size:.68rem;font-weight:700;color:#6B7280;letter-spacing:.07em;margin-bottom:4px;">LANGUAGE</div>
+      <div style="font-weight:700;color:#1E1B4B;">{{ sub.language }}</div>
+    </div>
+    <div style="background:#F5F3FF;border-radius:12px;padding:16px;">
+      <div style="font-size:.68rem;font-weight:700;color:#6B7280;letter-spacing:.07em;margin-bottom:4px;">STATUS</div>
+      <div style="font-weight:700;">
+        {% if sub.status == 'Accepted' %}
+          <span style="color:#059669;">✓ Accepted</span>
+        {% elif sub.status == 'Wrong Answer' %}
+          <span style="color:#DC2626;">✗ Wrong Answer</span>
+        {% else %}
+          <span style="color:#D97706;">⚠ {{ sub.status }}</span>
+        {% endif %}
+      </div>
+    </div>
+    <div style="background:#F5F3FF;border-radius:12px;padding:16px;">
+      <div style="font-size:.68rem;font-weight:700;color:#6B7280;letter-spacing:.07em;margin-bottom:4px;">SCORE</div>
+      <div style="font-weight:700;color:#1E1B4B;">{{ sub.passed }}/{{ sub.total }} test cases</div>
+    </div>
+    <div style="background:#F5F3FF;border-radius:12px;padding:16px;">
+      <div style="font-size:.68rem;font-weight:700;color:#6B7280;letter-spacing:.07em;margin-bottom:4px;">RUNTIME</div>
+      <div style="font-weight:700;color:#1E1B4B;">{{ sub.runtime_ms }}ms</div>
+    </div>
+  </div>
+
+  <!-- Code -->
+  <div style="background:#1E1B4B;border-radius:14px;overflow:hidden;margin-bottom:20px;">
+    <div style="padding:12px 20px;background:#2D2A5E;color:rgba(255,255,255,.7);font-size:.78rem;font-weight:700;letter-spacing:.07em;display:flex;justify-content:space-between;align-items:center;">
+      <span>CODE</span>
+      <span style="opacity:.5;">{{ sub.language }}</span>
+    </div>
+    <pre style="padding:24px;color:#E8E6FF;font-family:'Fira Code','Courier New',monospace;font-size:.88rem;line-height:1.6;overflow-x:auto;margin:0;white-space:pre-wrap;word-break:break-word;">{{ sub.code }}</pre>
+  </div>
+
+  <!-- stdout -->
+  {% if sub.stdout %}
+  <details style="margin-bottom:14px;" open>
+    <summary style="cursor:pointer;font-weight:700;padding:12px 16px;background:#F0FDF4;border-radius:10px;color:#065F46;border:1px solid #D1FAE5;list-style:none;user-select:none;">▶ Standard Output</summary>
+    <pre style="background:#F0FDF4;border:1px solid #D1FAE5;border-top:none;border-radius:0 0 10px 10px;padding:16px;font-size:.85rem;color:#065F46;margin:0;overflow-x:auto;white-space:pre-wrap;">{{ sub.stdout }}</pre>
+  </details>
+  {% endif %}
+
+  <!-- stderr -->
+  {% if sub.stderr %}
+  <details style="margin-bottom:14px;">
+    <summary style="cursor:pointer;font-weight:700;padding:12px 16px;background:#FEF2F2;border-radius:10px;color:#DC2626;border:1px solid #FEE2E2;list-style:none;user-select:none;">▶ Standard Error</summary>
+    <pre style="background:#FEF2F2;border:1px solid #FEE2E2;border-top:none;border-radius:0 0 10px 10px;padding:16px;font-size:.85rem;color:#DC2626;margin:0;overflow-x:auto;white-space:pre-wrap;">{{ sub.stderr }}</pre>
+  </details>
+  {% endif %}
+
+</div>
+{% endblock %}

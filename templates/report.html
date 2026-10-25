@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Report — Lab OJ{% endblock %}
+{% block body %}
+<div style="display:flex;min-height:100vh;font-family:'Work Sans',sans-serif;">
+
+  <!-- SIDEBAR -->
+  <div style="width:260px;flex-shrink:0;background:#4F46E5;color:#fff;padding:32px 24px;display:flex;flex-direction:column;gap:20px;">
+    <div style="font-size:.7rem;letter-spacing:.1em;opacity:.6;font-weight:700;">📊 REPORT</div>
+    <h1 style="font-family:'Fraunces',serif;font-size:2rem;font-weight:900;line-height:1.1;">Session<br>Report</h1>
+    <p style="opacity:.7;font-size:.88rem;">Score breakdown per student and question.</p>
+
+    <!-- Session selector -->
+    <form method="GET" action="/admin/report" style="display:flex;flex-direction:column;gap:8px;">
+      <label style="font-size:.7rem;font-weight:700;opacity:.7;letter-spacing:.07em;">SELECT SESSION</label>
+      <select name="session_id" onchange="this.form.submit()" style="padding:8px 10px;border-radius:8px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:.88rem;cursor:pointer;">
+        {% for s in sessions %}
+        <option value="{{ s.id }}" {% if selected_sid == s.id %}selected{% endif %}>{{ s.title }} ({{ s.course_code }})</option>
+        {% endfor %}
+      </select>
+    </form>
+
+    {% if report_data %}
+    <!-- Stats -->
+    <div style="background:rgba(255,255,255,.12);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <div style="font-size:.65rem;opacity:.6;font-weight:700;letter-spacing:.07em;">STUDENTS</div>
+        <div style="font-size:1.4rem;font-weight:800;">{{ report_data.total_students }}</div>
+      </div>
+      <div>
+        <div style="font-size:.65rem;opacity:.6;font-weight:700;letter-spacing:.07em;">AVG SCORE</div>
+        <div style="font-size:1.4rem;font-weight:800;">{{ report_data.avg_score }}<span style="font-size:.9rem;opacity:.7;">/{{ report_data.max_possible }}</span></div>
+      </div>
+      <div>
+        <div style="font-size:.65rem;opacity:.6;font-weight:700;letter-spacing:.07em;">FULL MARKS</div>
+        <div style="font-size:1.4rem;font-weight:800;">{{ report_data.full_marks }}</div>
+      </div>
+    </div>
+
+    <!-- CSV download -->
+    <a href="/admin/report/export-csv?session_id={{ current_session.id }}"
+       style="display:block;text-align:center;padding:10px;background:rgba(255,255,255,.15);color:#fff;border-radius:10px;font-weight:700;font-size:.88rem;text-decoration:none;border:1px solid rgba(255,255,255,.25);">
+      ⬇️ Download CSV
+    </a>
+    {% endif %}
+
+    <a href="/admin" style="margin-top:auto;display:block;text-align:center;padding:10px;background:rgba(255,255,255,.1);color:#fff;border-radius:10px;font-size:.85rem;font-weight:600;text-decoration:none;">← Back to Admin</a>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div style="flex:1;padding:32px 36px;overflow-x:auto;background:#F8F7FF;">
+
+    {% if not sessions %}
+    <div style="text-align:center;padding:80px;color:#6B7280;">No sessions found.</div>
+
+    {% elif not report_data or not report_data.students %}
+    <div style="text-align:center;padding:80px;color:#6B7280;">
+      <div style="font-size:3rem;margin-bottom:16px;">📭</div>
+      <div style="font-size:1.1rem;font-weight:600;">No student data for this session yet.</div>
+    </div>
+
+    {% else %}
+    <!-- Session heading -->
+    <div style="margin-bottom:24px;">
+      <h2 style="font-family:'Fraunces',serif;font-size:1.5rem;font-weight:800;color:#1E1B4B;">{{ current_session.title }}</h2>
+      <div style="color:#6B7280;font-size:.88rem;">{{ current_session.course_code }} · {{ current_session.window_start | myt }} → {{ current_session.window_end | myt }} · {{ current_session.duration_minutes }} min</div>
+    </div>
+
+    <!-- MATRIX TABLE -->
+    <div style="background:#fff;border-radius:14px;border:1px solid #E5E7EB;overflow:hidden;margin-bottom:28px;">
+      <div style="padding:16px 20px;border-bottom:1px solid #E5E7EB;font-weight:700;font-size:.88rem;letter-spacing:.05em;">SCORE MATRIX</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:.83rem;min-width:500px;">
+          <thead>
+            <tr style="background:#F5F3FF;">
+              <th style="text-align:left;padding:10px 14px;border-bottom:2px solid #E5E7EB;white-space:nowrap;position:sticky;left:0;background:#F5F3FF;z-index:2;">Matric No</th>
+              {% for q in report_data.questions %}
+              <th style="text-align:center;padding:10px 8px;border-bottom:2px solid #E5E7EB;color:#4F46E5;font-size:.75rem;max-width:90px;">
+                Q{{ loop.index }}<br>
+                <span style="font-weight:500;color:#6B7280;font-size:.7rem;">{{ q.title[:18] }}{% if q.title|length > 18 %}…{% endif %}</span>
+              </th>
+              {% endfor %}
+              <th style="text-align:center;padding:10px 12px;border-bottom:2px solid #E5E7EB;white-space:nowrap;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for st in report_data.students %}
+            {% set matric = st.matric_no %}
+            <tr style="border-bottom:1px solid #F0F0F0;">
+              <td style="padding:10px 14px;font-weight:600;white-space:nowrap;position:sticky;left:0;background:#fff;z-index:1;">{{ matric }}</td>
+              {% for q in report_data.questions %}
+              {% set score = report_data.matrix[matric][q.id] %}
+              {% if score is none %}
+                <td style="text-align:center;padding:8px;background:#F9FAFB;color:#9CA3AF;font-size:.8rem;">—</td>
+              {% elif score >= 100 %}
+                <td style="text-align:center;padding:8px;background:#D1FAE5;color:#065F46;font-weight:700;font-size:.82rem;">✓</td>
+              {% elif score > 0 %}
+                <td style="text-align:center;padding:8px;background:#FEF9C3;color:#92400E;font-size:.82rem;">{{ score|int }}%</td>
+              {% else %}
+                <td style="text-align:center;padding:8px;background:#FEE2E2;color:#DC2626;font-size:.82rem;">✗</td>
+              {% endif %}
+              {% endfor %}
+              <td style="text-align:center;padding:10px 12px;font-weight:700;color:#1E1B4B;">{{ report_data.totals[matric]|int }}/{{ report_data.max_possible }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <!-- Legend -->
+      <div style="padding:12px 20px;border-top:1px solid #F0F0F0;display:flex;gap:16px;font-size:.78rem;color:#6B7280;">
+        <span><span style="display:inline-block;width:14px;height:14px;background:#D1FAE5;border-radius:3px;vertical-align:middle;margin-right:4px;"></span>100% (Full mark)</span>
+        <span><span style="display:inline-block;width:14px;height:14px;background:#FEF9C3;border-radius:3px;vertical-align:middle;margin-right:4px;"></span>Partial</span>
+        <span><span style="display:inline-block;width:14px;height:14px;background:#FEE2E2;border-radius:3px;vertical-align:middle;margin-right:4px;"></span>0%</span>
+        <span><span style="display:inline-block;width:14px;height:14px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:3px;vertical-align:middle;margin-right:4px;"></span>Not attempted</span>
+      </div>
+    </div>
+
+    <!-- QUESTION STATS -->
+    <div style="background:#fff;border-radius:14px;border:1px solid #E5E7EB;overflow:hidden;">
+      <div style="padding:16px 20px;border-bottom:1px solid #E5E7EB;font-weight:700;font-size:.88rem;letter-spacing:.05em;">QUESTION ANALYSIS</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+        <thead>
+          <tr style="background:#F5F3FF;">
+            <th style="text-align:left;padding:10px 16px;border-bottom:2px solid #E5E7EB;">#</th>
+            <th style="text-align:left;padding:10px 16px;border-bottom:2px solid #E5E7EB;">Question</th>
+            <th style="text-align:center;padding:10px 16px;border-bottom:2px solid #E5E7EB;">Chapter</th>
+            <th style="text-align:center;padding:10px 16px;border-bottom:2px solid #E5E7EB;">Difficulty</th>
+            <th style="text-align:center;padding:10px 16px;border-bottom:2px solid #E5E7EB;">Attempted</th>
+            <th style="text-align:center;padding:10px 16px;border-bottom:2px solid #E5E7EB;">Passed</th>
+            <th style="text-align:center;padding:10px 16px;border-bottom:2px solid #E5E7EB;">Pass Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for q in report_data.questions %}
+          {% set stat = report_data.q_stats[q.id|string] %}
+          {% set rate = (stat.passed / stat.attempted * 100)|int if stat.attempted > 0 else 0 %}
+          <tr style="border-bottom:1px solid #F0F0F0;">
+            <td style="padding:10px 16px;color:#6B7280;">Q{{ loop.index }}</td>
+            <td style="padding:10px 16px;font-weight:600;">{{ q.title }}</td>
+            <td style="text-align:center;padding:10px 16px;">{{ q.chapter }}</td>
+            <td style="text-align:center;padding:10px 16px;">
+              <span style="padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:700;
+                {% if q.difficulty in ['Mudah','Easy'] %}background:#D1FAE5;color:#065F46;
+                {% elif q.difficulty in ['Sederhana','Medium'] %}background:#FEF9C3;color:#92400E;
+                {% else %}background:#FEE2E2;color:#DC2626;{% endif %}">
+                {{ q.difficulty|replace("Mudah","Easy")|replace("Sederhana","Medium")|replace("Susah","Hard") }}
+              </span>
+            </td>
+            <td style="text-align:center;padding:10px 16px;">{{ stat.attempted }}/{{ report_data.total_students }}</td>
+            <td style="text-align:center;padding:10px 16px;color:#059669;font-weight:600;">{{ stat.passed }}</td>
+            <td style="text-align:center;padding:10px 16px;">
+              <div style="display:flex;align-items:center;gap:8px;justify-content:center;">
+                <div style="width:60px;height:6px;background:#E5E7EB;border-radius:3px;overflow:hidden;">
+                  <div style="height:100%;width:{{ rate }}%;background:{% if rate>=80 %}#059669{% elif rate>=40 %}#D97706{% else %}#DC2626{% endif %};border-radius:3px;"></div>
+                </div>
+                <span style="font-size:.8rem;font-weight:600;">{{ rate }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
