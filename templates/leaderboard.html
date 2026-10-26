@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Leaderboard — Lab UTeM OJ{% endblock %}
+{% block title %}Leaderboard — Lab UTeM OJ
+<script>document.getElementById('lang-toggle-wrap').style.display='block';</script>
+{% endblock %}
 {% block body %}
 <div class="layout">
   <div class="left-panel">
@@ -10,7 +12,7 @@
     </div>
     <div style="position:relative;z-index:1">
       <div class="info-card" style="margin-bottom:10px">
-        <div class="lbl">You</div>
+        <div class="lbl" data-i18n="lb.you">You</div>
         <div class="name">{{ user.matric_no }}</div>
         {% if current_session %}
         <div class="sub" style="margin-top:6px">{{ current_session.title }}</div>
@@ -30,7 +32,7 @@
   <div class="right-panel">
     <div class="section-header">
       <div>
-        <div class="section-title">Rankings</div>
+        <div class="section-title" data-i18n="lb.title">Leaderboard</div>
         <div class="section-sub">
           {% if current_session %}{{ current_session.title }} · {{ current_session.course_code }}{% else %}No session selected{% endif %}
         </div>
@@ -88,7 +90,7 @@
         <thead>
           <tr>
             <th style="width:60px">#</th>
-            <th>Matric No.</th>
+            <th data-i18n="lb.matric">Matric No.</th>
             <th style="text-align:center">Score</th>
             <th style="text-align:center">Time</th>
             <th style="text-align:center">Attempts</th>
@@ -105,7 +107,7 @@
             </td>
             <td style="font-weight:600">
               {{ e.matric_no }}
-              {% if e.matric_no == user.matric_no %}<span class="badge badge-solved" style="margin-left:6px;font-size:0.7rem">You</span>{% endif %}
+              {% if e.matric_no == user.matric_no %}<span class="badge badge-solved" style="margin-left:6px;font-size:0.7rem" data-i18n="lb.you">You</span>{% endif %}
             </td>
             <td style="text-align:center;font-weight:700;color:var(--indigo)">{{ e.score_display }}</td>
             <td style="text-align:center;font-family:monospace;font-size:0.9rem">{{ e.time_display }}</td>
@@ -123,4 +125,6 @@
     {% endif %}
   </div>
 </div>
+
+<script>document.getElementById('lang-toggle-wrap').style.display='block';</script>
 {% endblock %}

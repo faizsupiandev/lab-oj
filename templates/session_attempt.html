@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{% block title %}{{ session.title }} — Lab UTeM OJ{% endblock %}
+{% block title %}{{ session.title }} — Lab UTeM OJ
+<script>document.getElementById('lang-toggle-wrap').style.display='block';</script>
+{% endblock %}
 {% block extra_head %}
 <!-- CodeMirror -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
@@ -30,6 +32,8 @@
 /* Status colors */
 .q-item.status-accepted{border-color:#34D399;background:rgba(52,211,153,.15)}
 .q-item.status-accepted .q-num{background:#34D399;color:#065f46}
+.q-item.status-partial{border-color:#FCD34D;background:rgba(252,211,77,.15)}
+.q-item.status-partial .q-num{background:#FCD34D;color:#78350f}
 .q-item.status-wrong{border-color:#FCA5A5;background:rgba(252,165,165,.12)}
 .q-item.status-wrong .q-num{background:#FCA5A5;color:#991b1b}
 .q-item.status-attempted{border-color:#FCD34D;background:rgba(252,211,77,.1)}
@@ -40,6 +44,7 @@
 .q-item.active .q-title{color:var(--indigo);font-weight:700}
 .q-badge{font-size:0.65rem;font-weight:700;padding:2px 6px;border-radius:6px;display:inline-block;margin-top:2px}
 .q-badge.accepted{background:#34D399;color:#065f46}
+.q-badge.partial{background:#FCD34D;color:#78350f}
 .q-badge.wrong{background:#FCA5A5;color:#991b1b}
 .q-badge.attempted{background:#FCD34D;color:#78350f}
 .q-badge.pending{background:rgba(255,255,255,.2);color:rgba(255,255,255,.6)}
@@ -55,6 +60,8 @@
 .timer-box.danger{background:#DC2626;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
 </style>
+
+<script>document.getElementById('lang-toggle-wrap').style.display='block';</script>
 {% endblock %}
 {% block body %}
 <!-- Top bar -->
@@ -73,8 +80,8 @@
     {% else %}
     <span class="badge badge-accepted">✓ Session Complete</span>
     {% endif %}
-    <button id="lang-toggle" onclick="toggleLang()" style="background:var(--indigo);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:4px 12px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif">BM</button>
-    <a href="/sessions" class="btn btn-secondary btn-sm">← Exit</a>
+    
+    <a href="/sessions" class="btn btn-secondary btn-sm"><span data-i18n="attempt.exit">← Exit</span></a>
   </div>
 </div>
 
@@ -89,13 +96,17 @@
       {% for q in questions %}
       {% set sub = submissions.get(q.id) %}
       {% set status_class = '' %}
-      {% set badge_text = 'Not attempted' %}
+      {% set badge_text = '<span data-i18n="attempt.not_attempted">Not attempted</span>' %}
       {% set badge_class = 'pending' %}
       {% if sub %}
         {% if sub.status == 'Accepted' %}
           {% set status_class = 'status-accepted' %}
           {% set badge_text = '✅ Accepted' %}
           {% set badge_class = 'accepted' %}
+        {% elif sub.passed and sub.total and sub.passed > 0 %}
+          {% set status_class = 'status-partial' %}
+          {% set badge_text = '⚡ ' + sub.passed|string + '/' + sub.total|string + ' cases' %}
+          {% set badge_class = 'partial' %}
         {% else %}
           {% set status_class = 'status-wrong' %}
           {% set badge_text = '❌ ' + sub.status %}
@@ -178,14 +189,14 @@
 
     {% if attempt.status == 'IN_PROGRESS' %}
     <div class="field" style="margin-bottom:14px">
-      <label data-i18n="language">Programming Language</label>
+      <label data-i18n="attempt.language">Language</label>
       <select id="lang-select">
         <option value="c++">C++ (GCC 10.2)</option>
         <option value="python">Python 3.10</option>
       </select>
     </div>
     <div class="field">
-      <label data-i18n="your_code">Your Code</label>
+      <label data-i18n="attempt.your_code">Your Code</label>
       <textarea class="code-editor" id="code-editor" style="display:none"></textarea>
       <div id="cm-editor" style="border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.15);min-height:340px"></div>
     </div>
@@ -193,7 +204,7 @@
       <span data-i18n="submit">Submit</span> →
     </button>
     {% else %}
-    <div class="alert alert-success" style="margin-bottom:18px">✅ This session has been completed.</div>
+    <div class="alert alert-success" style="margin-bottom:18px"><span data-i18n="attempt.completed">This session has been completed.</span></div>
     <div id="readonly-result"></div>
     {% endif %}
   </div>
@@ -243,7 +254,7 @@ function autoSubmit() {
   // Show toast instead of blocking alert
   var toast = document.createElement('div');
   toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#DC2626;color:#fff;padding:14px 28px;border-radius:12px;font-weight:700;font-size:1rem;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3)';
-  toast.textContent = '⏰ Time is up! Submitting your answers...';
+  toast.textContent = t('attempt.time_up');
   document.body.appendChild(toast);
   setTimeout(function() {
     document.querySelector('form[action="/sessions/' + SID + '/finalize"]').submit();
@@ -401,8 +412,8 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!CM.getValue().trim()) {
         var q = QUESTIONS[CURRENT_Q_IDX];
         if (q && q.default_template) CM.setValue(q.default_template);
-        else if (this.value === 'c++') CM.setValue('#include <iostream>\nusing namespace std;\nint main() {\n    \n    return 0;\n}');
-        else CM.setValue('# your code here\n');
+        else if (this.value === 'c++') CM.setValue('');
+        else CM.setValue('');
         // Place cursor at line 4
         CM.setCursor({line: 3, ch: 4});
       }
@@ -417,7 +428,7 @@ function submitCode() {
   var code = CM ? CM.getValue() : document.getElementById('code-editor').value;
   var lang = document.getElementById('lang-select').value;
   var btn = document.getElementById('submit-btn');
-  btn.innerHTML = '⏳ Processing...';
+  btn.innerHTML = t('attempt.processing');
   btn.disabled = true;
 
   var fd = new FormData();
@@ -434,10 +445,13 @@ function submitCode() {
       var item = document.getElementById('qitem-' + CURRENT_Q_IDX);
       var badge = document.getElementById('qbadge-' + CURRENT_Q_IDX);
       if (item) {
-        item.classList.remove('status-accepted','status-wrong','status-attempted');
+        item.classList.remove('status-accepted','status-partial','status-wrong','status-attempted');
         if (data.status === 'Accepted') {
           item.classList.add('status-accepted');
           if (badge) { badge.className = 'q-badge accepted'; badge.textContent = '✅ Accepted'; }
+        } else if (data.passed > 0) {
+          item.classList.add('status-partial');
+          if (badge) { badge.className = 'q-badge partial'; badge.textContent = '⚡ ' + data.passed + '/' + data.total + ' cases'; }
         } else {
           item.classList.add('status-wrong');
           if (badge) { badge.className = 'q-badge wrong'; badge.textContent = '❌ ' + data.status; }
@@ -449,7 +463,7 @@ function submitCode() {
       document.getElementById('result-area').innerHTML = '<div class="alert alert-error">Error: ' + e + '</div>';
     })
     .finally(function() {
-      btn.innerHTML = 'Submit →';
+      btn.innerHTML = t('attempt.submit');
       btn.disabled = false;
     });
 }
@@ -476,8 +490,9 @@ window.addEventListener('load', function() {
 });
 
 function getDefaultTemplate(lang) {
-  if (lang === 'python') return '# your code here\n';
-  return '#include <iostream>\nusing namespace std;\nint main() {\n    \n    return 0;\n}';
+  return '';  // Empty canvas — student writes from scratch
 }
 </script>
+
+<script>document.getElementById('lang-toggle-wrap').style.display='block';</script>
 {% endblock %}

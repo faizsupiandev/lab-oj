@@ -137,10 +137,75 @@ tr.highlight td{background:var(--indigo-l)}
 </style>
 {% block extra_head %}{% endblock %}
 <script>
-// No i18n — English only
+var LANG = localStorage.getItem('laboj_lang') || 'en';
+var I18N = {
+  en: {
+    'login.title':'Student Login','login.subtitle':'Lab Assessment System',
+    'login.matric_label':'Matric No.','login.matric_placeholder':'e.g. B012345678',
+    'login.pass_label':'Password (Phone Number)','login.pass_placeholder':'e.g. 0123456789',
+    'login.btn':'Login',
+    'sessions.title':'Available Sessions','sessions.subtitle':'Select an active session and begin your timed assessment.',
+    'sessions.start_btn':'Start Session','sessions.no_sessions':'No active sessions available.',
+    'attempt.submit':'Submit →','attempt.processing':'⏳ Processing...','attempt.exit':'← Exit',
+    'attempt.not_attempted':'Not attempted','attempt.language':'Language','attempt.your_code':'Your Code',
+    'attempt.completed':'This session has been completed.','attempt.time_up':'⏰ Time is up! Submitting your answers...',
+    'lb.title':'Leaderboard','lb.rank':'Rank','lb.matric':'Matric No.',
+    'lb.score':'Score','lb.time':'Time','lb.attempts':'Attempts',
+    'lb.no_data':'No data yet for this session.','lb.session':'Session','lb.you':'You'
+  },
+  bm: {
+    'login.title':'Log Masuk Pelajar','login.subtitle':'Sistem Penilaian Makmal',
+    'login.matric_label':'No. Matrik','login.matric_placeholder':'cth. B012345678',
+    'login.pass_label':'Kata Laluan (Nombor Telefon)','login.pass_placeholder':'cth. 0123456789',
+    'login.btn':'Log Masuk',
+    'sessions.title':'Sesi Tersedia','sessions.subtitle':'Pilih sesi aktif dan mulakan penilaian anda.',
+    'sessions.start_btn':'Mula Sesi','sessions.no_sessions':'Tiada sesi aktif tersedia.',
+    'attempt.submit':'Hantar →','attempt.processing':'⏳ Memproses...','attempt.exit':'← Keluar',
+    'attempt.not_attempted':'Belum cuba','attempt.language':'Bahasa Pengaturcaraan','attempt.your_code':'Kod Anda',
+    'attempt.completed':'Sesi ini telah selesai.','attempt.time_up':'⏰ Masa tamat! Menghantar jawapan anda...',
+    'lb.title':'Papan Markah','lb.rank':'Kedudukan','lb.matric':'No. Matrik',
+    'lb.score':'Markah','lb.time':'Masa','lb.attempts':'Cubaan',
+    'lb.no_data':'Belum ada data untuk sesi ini.','lb.session':'Sesi','lb.you':'Anda'
+  }
+};
+function t(k){return(I18N[LANG]||I18N.en)[k]||(I18N.en)[k]||k;}
+function applyLang(){
+  document.querySelectorAll('[data-i18n]').forEach(function(el){
+    var key=el.getAttribute('data-i18n');
+    var attr=el.getAttribute('data-i18n-attr');
+    if(attr)el.setAttribute(attr,t(key));
+    else el.textContent=t(key);
+  });
+  var btn=document.getElementById('lang-btn');
+  if(btn)btn.textContent=LANG==='en'?'BM':'EN';
+}
+function toggleLang(){
+  LANG=LANG==='en'?'bm':'en';
+  localStorage.setItem('laboj_lang',LANG);
+  applyLang();
+}
+document.addEventListener('DOMContentLoaded',function(){applyLang();});
 </script>
 </head>
 <body>
+{% if toast %}
+<div id="toast-msg" style="
+  position:fixed;top:20px;right:20px;z-index:9999;
+  background:#1E1B4B;color:#fff;
+  padding:12px 20px;border-radius:12px;
+  font-size:.9rem;font-weight:600;
+  box-shadow:0 4px 20px rgba(0,0,0,.25);
+  display:flex;align-items:center;gap:10px;
+  animation:slideIn .3s ease;
+">{{ toast }}<button onclick="document.getElementById('toast-msg').remove()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1rem;opacity:.6;padding:0;margin-left:8px;">✕</button></div>
+<style>
+@keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+</style>
+<script>setTimeout(function(){var t=document.getElementById('toast-msg');if(t)t.style.animation='slideIn .3s ease reverse';setTimeout(function(){if(t)t.remove();},300);},3500);</script>
+{% endif %}
+<div id="lang-toggle-wrap" style="display:none;position:fixed;bottom:24px;right:24px;z-index:8888;">
+  <button id="lang-btn" onclick="toggleLang()" style="background:#6366F1;color:#fff;border:none;border-radius:20px;padding:8px 18px;font-size:.82rem;font-weight:700;cursor:pointer;box-shadow:0 2px 12px rgba(99,102,241,.4);font-family:'Work Sans',sans-serif;">BM</button>
+</div>
 {% block body %}{% endblock %}
 </body>
 </html>

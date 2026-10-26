@@ -382,7 +382,7 @@ async def login_page(request: Request):
     user = get_current_user(request)
     if user:
         if user["is_admin"]:
-            return RedirectResponse("/admin", status_code=302)
+            return RedirectResponse("/admin?msg=done", status_code=302)
         return RedirectResponse("/sessions", status_code=302)
     return templates.TemplateResponse(request, "login.html", {"error": None})
 
@@ -470,7 +470,7 @@ async def sessions_list(request: Request):
     if not user:
         return RedirectResponse("/", status_code=302)
     if user["is_admin"]:
-        return RedirectResponse("/admin", status_code=302)
+        return RedirectResponse("/admin?msg=done", status_code=302)
 
     conn = get_db()
     sessions_raw = conn.execute(
@@ -1032,13 +1032,21 @@ async def leaderboard(request: Request):
 # --- Admin Routes ---
 
 @app.get("/admin", response_class=HTMLResponse)
-async def admin_page(request: Request):
+async def admin_page(request: Request, msg: str = None):
     user = get_current_user(request)
     if not user or not user["is_admin"]:
         return RedirectResponse("/", status_code=302)
     conn = get_db()
     ctx = _admin_ctx(conn)
     conn.close()
+    toast_map = {
+        "done": "✅ Done!",
+        "saved": "✅ Changes saved!",
+        "added": "✅ Added successfully!",
+        "deleted": "🗑️ Deleted.",
+        "toggled": "✅ Status updated.",
+    }
+    ctx["toast"] = toast_map.get(msg, None)
     return templates.TemplateResponse(request, "admin.html", {
         "user": user, **ctx, "msg": None, "error": None
     })
@@ -1107,7 +1115,7 @@ async def toggle_problem(request: Request, pid: int):
     conn.execute("UPDATE problems SET is_active = 1-is_active WHERE id=?", (pid,))
     conn.commit()
     conn.close()
-    return RedirectResponse("/admin", status_code=302)
+    return RedirectResponse("/admin?msg=done", status_code=302)
 
 
 # --- Admin: Question Bank ---
@@ -1274,7 +1282,7 @@ async def admin_session_remove_question(request: Request, sid: int, question_id:
     conn.execute("DELETE FROM session_questions WHERE session_id=? AND question_id=?", (sid, question_id))
     conn.commit()
     conn.close()
-    return RedirectResponse("/admin", status_code=302)
+    return RedirectResponse("/admin?msg=done", status_code=302)
 
 
 @app.post("/admin/sessions/{sid}/toggle")
@@ -1286,11 +1294,11 @@ async def admin_toggle_session(request: Request, sid: int):
     conn.execute("UPDATE lab_sessions SET is_active=1-is_active WHERE id=?", (sid,))
     conn.commit()
     conn.close()
-    return RedirectResponse("/admin", status_code=302)
+    return RedirectResponse("/admin?msg=done", status_code=302)
 
 
 @app.get("/admin/sessions/{sid}/edit", response_class=HTMLResponse)
-async def admin_session_edit_get(request: Request, sid: int):
+async def admin_session_edit_get(request: Request, sid: int, msg: str = None):
     user = get_current_user(request)
     if not user or not user["is_admin"]:
         return RedirectResponse("/", status_code=302)
@@ -1298,7 +1306,7 @@ async def admin_session_edit_get(request: Request, sid: int):
     session = conn.execute("SELECT * FROM lab_sessions WHERE id=?", (sid,)).fetchone()
     if not session:
         conn.close()
-        return RedirectResponse("/admin", status_code=302)
+        return RedirectResponse("/admin?msg=done", status_code=302)
     session = dict(session)
     # Questions assigned to this session
     assigned = conn.execute("""
@@ -1318,7 +1326,8 @@ async def admin_session_edit_get(request: Request, sid: int):
     conn.close()
     return templates.TemplateResponse(request, "session_edit.html", {
         "user": user, "session": session,
-        "assigned": assigned, "all_questions": all_questions
+        "assigned": assigned, "all_questions": all_questions,
+        "toast": "✅ Changes saved!" if msg == "saved" else None
     })
 
 
@@ -1340,7 +1349,7 @@ async def admin_session_edit_post(
     """, (title, course_code, window_start, window_end, duration_minutes, is_active, sid))
     conn.commit()
     conn.close()
-    return RedirectResponse(f"/admin/sessions/{sid}/edit", status_code=302)
+    return RedirectResponse(f"/admin/sessions/{sid}/edit?msg=saved", status_code=302)
 
 
 # ─── Admin Report ──────────────────────────────────────────────────────────────

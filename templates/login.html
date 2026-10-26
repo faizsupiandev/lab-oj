@@ -1,12 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Login — Lab UTeM OJ{% endblock %}
+{% block title %}Login — Lab UTeM OJ
+<script>document.getElementById('lang-toggle-wrap').style.display='block';</script>
+{% endblock %}
 {% block body %}
 <div class="layout">
   <div class="left-panel" style="position:relative">
-    <button class="lang-btn-login" id="lang-toggle" onclick="toggleLang()" style="position:absolute;top:12px;right:16px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:4px 12px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;z-index:10">BM</button>
+    
     <div class="brand">
       <div class="brand-badge">✦ Online Judge</div>
-      <h1>Lab<br>UTeM</h1>
+      <h1 data-i18n="login.title">Lab<br>UTeM</h1>
       <p>Automated code assessment platform for UTeM students.</p>
     </div>
     <div class="info-card">
@@ -17,8 +19,8 @@
   </div>
   <div class="right-panel" style="justify-content:center">
     <div style="max-width:420px;width:100%;margin:auto">
-      <div class="form-title">Login</div>
-      <div class="form-subtitle">Enter your credentials to access the system</div>
+      <div class="form-title" data-i18n="login.title">Student Login</div>
+      <div class="form-subtitle" data-i18n="login.subtitle">Lab Assessment System</div>
 
       {% if error %}
       <div class="alert alert-error">{{ error }}</div>
@@ -26,15 +28,15 @@
 
       <form method="post" action="/">
         <div class="field">
-          <label>Matric No.</label>
-          <input type="text" name="matric" class="upper" placeholder="e.g. B012345678" autocomplete="off" required>
+          <label data-i18n="login.matric_label">Matric No.</label>
+          <input type="text" name="matric" class="upper" placeholder="e.g. B012345678" data-i18n="login.matric_placeholder" data-i18n-attr="placeholder" autocomplete="off" required>
         </div>
         <div class="field">
-          <label id="pw-label" data-i18n="password_label">Password (Phone Number)</label>
-          <input type="password" name="phone" placeholder="Password (Phone Number)" required>
+          <label data-i18n="login.pass_label">Password (Phone Number)</label>
+          <input type="password" name="phone" placeholder="Password (Phone Number)" data-i18n="login.pass_placeholder" data-i18n-attr="placeholder" required>
         </div>
         <button type="submit" class="btn btn-primary btn-full" style="margin-top:8px">
-          Login →
+          <span data-i18n="login.btn">Login</span> →
         </button>
       </form>
 
@@ -44,4 +46,6 @@
     </div>
   </div>
 </div>
+
+<script>document.getElementById('lang-toggle-wrap').style.display='block';</script>
 {% endblock %}
