@@ -1432,7 +1432,11 @@ async def export_report_csv(request: Request, session_id: int):
     if not user or not user["is_admin"]:
         return RedirectResponse("/", status_code=302)
     conn = get_db()
-    session = dict(conn.execute("SELECT * FROM lab_sessions WHERE id=?", (session_id,)).fetchone())
+    sess_row = conn.execute("SELECT * FROM lab_sessions WHERE id=?", (session_id,)).fetchone()
+    if not sess_row:
+        conn.close()
+        return JSONResponse({"error": "Session not found"}, status_code=404)
+    session = dict(sess_row)
     questions = [dict(q) for q in conn.execute("""
         SELECT qb.id, qb.title FROM session_questions sq
         JOIN question_bank qb ON sq.question_id=qb.id
@@ -1450,23 +1454,25 @@ async def export_report_csv(request: Request, session_id: int):
     for st in students:
         matric = st["matric_no"]
         row = [matric]
-        total = 0
+        total_score = 0
         for q in questions:
             best = conn.execute("""
-                SELECT MAX(CAST(passed AS REAL)/CASE WHEN total=0 THEN 1 ELSE total END * 100)
-                FROM session_submissions WHERE matric_no=? AND session_id=? AND question_id=?
+                SELECT MAX(CAST(passed AS REAL)/CASE WHEN ss.total=0 THEN 1 ELSE ss.total END * 100)
+                FROM session_submissions ss WHERE ss.matric_no=? AND ss.session_id=? AND ss.question_id=?
             """, (matric, session_id, q["id"])).fetchone()[0]
             score = round(best, 1) if best is not None else 0
-            total += score
+            total_score += score
             row.append(score)
-        row.extend([round(total, 1), max_score])
+        row.extend([round(total_score, 1), max_score])
         writer.writerow(row)
     conn.close()
     output.seek(0)
-    safe_title = session["title"].replace(" ", "_").replace("/", "-")
+    csv_bytes = output.getvalue().encode('utf-8-sig')  # BOM for Excel
+    safe_title = ''.join(c for c in session["title"] if c.isalnum() or c in ' _-').replace(' ', '_')
     filename = f"report_{safe_title}_{session_id}.csv"
     return StreamingResponse(
-        iter([output.getvalue()]), media_type="text/csv",
+        iter([csv_bytes]),
+        media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
