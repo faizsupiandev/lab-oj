@@ -1,6 +1,18 @@
 {% extends "base.html" %}
 {% block title %}{{ session.title }} — Lab UTeM OJ{% endblock %}
 {% block extra_head %}
+<!-- CodeMirror -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/comment/comment.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.css">
 <style>
 /* 3-column layout: sidebar | question | code */
 .attempt-layout{display:grid;grid-template-columns:220px 1fr 1.2fr;height:calc(100vh - 60px);overflow:hidden}
@@ -174,8 +186,8 @@
     </div>
     <div class="field">
       <label data-i18n="your_code">Your Code</label>
-      <textarea class="code-editor" id="code-editor" style="min-height:320px"
-        placeholder="#include &lt;iostream&gt;&#10;using namespace std;&#10;int main() {&#10;    return 0;&#10;}"></textarea>
+      <textarea class="code-editor" id="code-editor" style="display:none"></textarea>
+      <div id="cm-editor" style="border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.15);min-height:340px"></div>
     </div>
     <button class="btn btn-primary btn-full" id="submit-btn" onclick="submitCode()">
       <span data-i18n="submit">Submit</span> →
@@ -190,6 +202,11 @@
 <script>
 var QUESTIONS = {{ questions_json | safe }};
 var SUBMISSIONS = {{ submissions_json | safe }};
+var CM = null;
+function getCmMode(lang) { return lang === 'python' ? 'python' : 'text/x-c++src'; }
+function getDefaultTemplate(lang) {
+  return lang === 'python' ? '# your code here\n' : '#include <iostream>\nusing namespace std;\nint main() {\n    \n    return 0;\n}';
+}
 var CURRENT_Q_IDX = {{ q_idx }};
 var SID = {{ sid }};
 var REMAINING = {{ remaining_seconds }};
@@ -259,14 +276,24 @@ function switchQuestion(idx) {
   var content = document.getElementById('q-content');
   if (content) content.innerHTML = renderQuestion(q);
 
-  // Load code
-  var editor = document.getElementById('code-editor');
+  // Load code into CodeMirror (or fallback textarea)
   var sub = SUBMISSIONS[String(q.id)];
-  if (editor) {
-    editor.value = sub ? (sub.code || '') : (q.default_template || '');
-    if (sub && document.getElementById('lang-select'))
-      document.getElementById('lang-select').value = sub.language || 'c++';
+  var langSel = document.getElementById('lang-select');
+  var lang = (sub && sub.language) ? sub.language : (langSel ? langSel.value : 'c++');
+  if (sub && langSel) langSel.value = sub.language || 'c++';
+
+  var newCode = sub ? (sub.code || '') : (q.default_template || getDefaultTemplate(lang));
+  if (typeof CM !== 'undefined' && CM) {
+    CM.setOption('mode', getCmMode(lang));
+    CM.setValue(newCode);
+    if (!sub) CM.setCursor({line: 3, ch: 4});
+    else CM.setCursor({line: CM.lineCount()-1, ch: 0});
+    CM.focus();
+  } else {
+    var editor = document.getElementById('code-editor');
+    if (editor) editor.value = newCode;
   }
+
   showResult(q.id);
   document.getElementById('q-label').textContent = 'Question ' + (idx+1) + ' / ' + QUESTIONS.length;
 }
@@ -329,13 +356,68 @@ if (langSel) {
   });
 }
 
+// submitCode is defined in the CodeMirror block below
+</script>
+
+<script>
+// ── CodeMirror Init ────────────────────────────────────────────────
+var CM = null;
+
+function getCmMode(lang) {
+  if (lang === 'python') return 'python';
+  return 'text/x-c++src';  // c++ / c
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var ta = document.getElementById('code-editor');
+  CM = CodeMirror(document.getElementById('cm-editor'), {
+    value: ta ? ta.value : '',
+    mode: getCmMode('c++'),
+    theme: 'dracula',
+    lineNumbers: true,
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: false,
+    autoCloseBrackets: true,
+    matchBrackets: true,
+    styleActiveLine: true,
+    lineWrapping: false,
+    extraKeys: {
+      'Tab': function(cm) { cm.replaceSelection('    ', 'end'); },
+      'Ctrl-/': 'toggleComment',
+      'Cmd-/':  'toggleComment',
+    }
+  });
+
+  // Sync CM height to fill panel
+  CM.setSize('100%', 'calc(100vh - 360px)');
+
+  // Sync language selector → change CM mode
+  var langSel = document.getElementById('lang-select');
+  if (langSel) {
+    langSel.addEventListener('change', function() {
+      CM.setOption('mode', getCmMode(this.value));
+      // If editor empty, set default template
+      if (!CM.getValue().trim()) {
+        var q = QUESTIONS[CURRENT_Q_IDX];
+        if (q && q.default_template) CM.setValue(q.default_template);
+        else if (this.value === 'c++') CM.setValue('#include <iostream>\nusing namespace std;\nint main() {\n    \n    return 0;\n}');
+        else CM.setValue('# your code here\n');
+        // Place cursor at line 4
+        CM.setCursor({line: 3, ch: 4});
+      }
+    });
+  }
+});
+
+// Override submitCode to use CM value
 function submitCode() {
   var q = QUESTIONS[CURRENT_Q_IDX];
   if (!q) return;
-  var code = document.getElementById('code-editor').value;
+  var code = CM ? CM.getValue() : document.getElementById('code-editor').value;
   var lang = document.getElementById('lang-select').value;
   var btn = document.getElementById('submit-btn');
-  btn.textContent = 'Processing...';
+  btn.innerHTML = '⏳ Processing...';
   btn.disabled = true;
 
   var fd = new FormData();
@@ -344,12 +426,11 @@ function submitCode() {
   fd.append('language', lang);
 
   fetch('/sessions/' + SID + '/submit', { method: 'POST', body: fd })
-    .then(r => r.json())
+    .then(function(r) { return r.json(); })
     .then(function(data) {
       SUBMISSIONS[String(q.id)] = Object.assign({ code: code, language: lang }, data);
       showResult(q.id);
 
-      // Update sidebar item
       var item = document.getElementById('qitem-' + CURRENT_Q_IDX);
       var badge = document.getElementById('qbadge-' + CURRENT_Q_IDX);
       if (item) {
@@ -368,10 +449,35 @@ function submitCode() {
       document.getElementById('result-area').innerHTML = '<div class="alert alert-error">Error: ' + e + '</div>';
     })
     .finally(function() {
-      btn.innerHTML = '<span data-i18n="submit">Submit</span> →';
-      applyI18n(localStorage.getItem('laboj_lang')||'en');
+      btn.innerHTML = 'Submit →';
       btn.disabled = false;
     });
+}
+
+// Override renderQuestion to use CM
+var _origRenderQ = window.renderQuestion;
+window.addEventListener('load', function() {
+  // Patch the switchQuestion function to update CM
+  var origSwitch = window.switchQuestion;
+  window.switchQuestion = function(idx) {
+    if (typeof origSwitch === 'function') origSwitch(idx);
+    // After switch, update CM value from SUBMISSIONS or template
+    setTimeout(function() {
+      if (!CM) return;
+      var q = QUESTIONS[idx];
+      if (!q) return;
+      var sub = SUBMISSIONS[String(q.id)];
+      var newVal = sub ? (sub.code || '') : (q.default_template || getDefaultTemplate(document.getElementById('lang-select') ? document.getElementById('lang-select').value : 'c++'));
+      CM.setValue(newVal);
+      if (!sub) CM.setCursor({line: 3, ch: 4});
+      else CM.setCursor({line: CM.lineCount()-1, ch: 0});
+    }, 50);
+  };
+});
+
+function getDefaultTemplate(lang) {
+  if (lang === 'python') return '# your code here\n';
+  return '#include <iostream>\nusing namespace std;\nint main() {\n    \n    return 0;\n}';
 }
 </script>
 {% endblock %}
