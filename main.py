@@ -18,6 +18,36 @@ def now_myt_str() -> str:
     return now_myt().strftime('%Y-%m-%dT%H:%M')
 def now_myt_iso() -> str:
     return now_myt().isoformat()
+
+# Semaphore to limit concurrent Piston submissions (avoid overloading)
+PISTON_SEMAPHORE = None  # initialized at startup
+
+def call_piston(payload: bytes, timeout: int = 30, max_retries: int = 2) -> dict:
+    """Call Piston API with retry on transient errors."""
+    last_err = None
+    for attempt in range(max_retries + 1):
+        try:
+            req_obj = urllib.request.Request(
+                f"{PISTON_URL}/api/v2/execute",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req_obj, timeout=timeout) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 503) and attempt < max_retries:
+                time.sleep(1.5 * (attempt + 1))  # backoff
+                last_err = e
+                continue
+            raise
+        except Exception as e:
+            if attempt < max_retries:
+                time.sleep(1.0 * (attempt + 1))
+                last_err = e
+                continue
+            raise
+    raise last_err
 from typing import Optional
 
 import pymysql
@@ -56,10 +86,12 @@ except Exception:
 
 # --- DB ---
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)  # wait up to 30s for lock
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=30000")  # 30s busy timeout
+    conn.execute("PRAGMA synchronous=NORMAL")   # faster writes, safe with WAL
     return conn
 
 
@@ -675,17 +707,10 @@ async def submit_session_code(
 
         t0 = time.time()
         try:
-            req_obj = urllib.request.Request(
-                f"{PISTON_URL}/api/v2/execute",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST"
-            )
-            with urllib.request.urlopen(req_obj, timeout=30) as resp:
-                piston_result = json.loads(resp.read())
+            piston_result = call_piston(payload, timeout=30)
         except Exception as e:
             overall_status = "Runtime Error"
-            last_stderr = str(e)
+            last_stderr = f"Execution service unavailable. Please retry. ({e})"
             break
 
         elapsed_ms = int((time.time() - t0) * 1000)
@@ -864,17 +889,10 @@ async def submit_code(request: Request, problem_id: int,
 
         t0 = time.time()
         try:
-            req_obj = urllib.request.Request(
-                f"{PISTON_URL}/api/v2/execute",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST"
-            )
-            with urllib.request.urlopen(req_obj, timeout=30) as resp:
-                result = json.loads(resp.read())
+            result = call_piston(payload, timeout=30)
         except Exception as e:
             overall_status = "Runtime Error"
-            last_stderr = str(e)
+            last_stderr = f"Execution service unavailable. Please retry. ({e})"
             break
 
         elapsed = int((time.time() - t0) * 1000)
