@@ -328,19 +328,7 @@ def get_current_user(request: Request) -> Optional[dict]:
 
 # --- Admin context helper ---
 def _admin_ctx(conn) -> dict:
-    problems = conn.execute("SELECT * FROM problems ORDER BY id").fetchall()
-    try:
-        submissions = conn.execute("""
-            SELECT s.*, u.matric_no, u.full_name, p.title as problem_title
-            FROM submissions s
-            JOIN users u ON s.user_id=u.id
-            JOIN problems p ON s.problem_id=p.id
-            ORDER BY s.id DESC LIMIT 100
-        """).fetchall()
-    except Exception:
-        submissions = []
-    students = conn.execute("SELECT * FROM users WHERE is_admin=0 ORDER BY id").fetchall()
-    questions = conn.execute("SELECT * FROM question_bank ORDER BY id").fetchall()
+    """Lightweight context: sessions (with sq_list/q_count) + questions for dropdowns."""
     sessions_raw = conn.execute("SELECT * FROM lab_sessions ORDER BY id DESC").fetchall()
     sessions = []
     for s in sessions_raw:
@@ -358,21 +346,12 @@ def _admin_ctx(conn) -> dict:
         """, (s["id"],)).fetchall()
         s["sq_list"] = [dict(r) for r in sq]
         sessions.append(s)
-    questions_list = []
-    for q in questions:
-        qd = dict(q)
-        try:
-            qd["hidden_test_count"] = len(json.loads(qd.get("hidden_tests") or "[]"))
-        except Exception:
-            qd["hidden_test_count"] = 0
-        questions_list.append(qd)
-    return {
-        "problems": [dict(p) for p in problems],
-        "submissions": [dict(s) for s in submissions],
-        "students": [dict(s) for s in students],
-        "questions": questions_list,
-        "sessions": sessions,
-    }
+    # Lightweight questions list — only what's needed for session add-question dropdowns
+    questions_raw = conn.execute(
+        "SELECT id, title, course_code, chapter FROM question_bank ORDER BY course_code, chapter, id"
+    ).fetchall()
+    questions = [dict(q) for q in questions_raw]
+    return {"sessions": sessions, "questions": questions}
 
 
 # --- Routes ---
@@ -1494,6 +1473,142 @@ async def admin_submission_detail(request: Request, sub_id: int):
     sub["session_title"] = sess["title"] if sess else "Unknown"
     conn.close()
     return templates.TemplateResponse(request, "submission_detail.html", {"user": user, "sub": sub})
+
+
+# ─── Admin AJAX API endpoints ──────────────────────────────────────────────────
+
+@app.get("/admin/api/sessions")
+async def api_admin_sessions(request: Request, page: int = 1, limit: int = 20):
+    user = get_current_user(request)
+    if not user or not user["is_admin"]:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    conn = get_db()
+    total = conn.execute("SELECT COUNT(*) FROM lab_sessions").fetchone()[0]
+    offset = (page - 1) * limit
+    rows = conn.execute(
+        "SELECT id, title, course_code, window_start, window_end, duration_minutes, is_active FROM lab_sessions ORDER BY id DESC LIMIT ? OFFSET ?",
+        (limit, offset)
+    ).fetchall()
+    sessions = []
+    for r in rows:
+        s = dict(r)
+        s["q_count"] = conn.execute(
+            "SELECT COUNT(*) FROM session_questions WHERE session_id=?", (s["id"],)
+        ).fetchone()[0]
+        sessions.append(s)
+    conn.close()
+    pages = max(1, (total + limit - 1) // limit)
+    return JSONResponse({"sessions": sessions, "total": total, "page": page, "pages": pages})
+
+
+@app.get("/admin/api/questions")
+async def api_admin_questions(
+    request: Request, page: int = 1, limit: int = 50,
+    search: str = None, course: str = None, chapter: int = None
+):
+    user = get_current_user(request)
+    if not user or not user["is_admin"]:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    conn = get_db()
+    where, params = [], []
+    if search:
+        where.append("title LIKE ?")
+        params.append(f"%{search}%")
+    if course:
+        where.append("course_code = ?")
+        params.append(course)
+    if chapter:
+        where.append("chapter = ?")
+        params.append(chapter)
+    w = ("WHERE " + " AND ".join(where)) if where else ""
+    total = conn.execute(f"SELECT COUNT(*) FROM question_bank {w}", params).fetchone()[0]
+    offset = (page - 1) * limit
+    rows = conn.execute(
+        f"SELECT id, title, course_code, chapter, difficulty, hidden_tests FROM question_bank {w} ORDER BY id LIMIT ? OFFSET ?",
+        params + [limit, offset]
+    ).fetchall()
+    questions = []
+    for r in rows:
+        q = dict(r)
+        try:
+            q["hidden_test_count"] = len(json.loads(q.get("hidden_tests") or "[]"))
+        except Exception:
+            q["hidden_test_count"] = 0
+        del q["hidden_tests"]
+        questions.append(q)
+    conn.close()
+    pages = max(1, (total + limit - 1) // limit)
+    return JSONResponse({"questions": questions, "total": total, "page": page, "pages": pages})
+
+
+@app.get("/admin/api/students")
+async def api_admin_students(
+    request: Request, page: int = 1, limit: int = 50, search: str = None
+):
+    user = get_current_user(request)
+    if not user or not user["is_admin"]:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    conn = get_db()
+    where = "u.is_admin = 0"
+    params: list = []
+    if search:
+        where += " AND (u.matric_no LIKE ? OR u.full_name LIKE ?)"
+        params.extend([f"%{search}%", f"%{search}%"])
+    total = conn.execute(f"SELECT COUNT(*) FROM users u WHERE {where}", params).fetchone()[0]
+    offset = (page - 1) * limit
+    rows = conn.execute(f"""
+        SELECT u.matric_no, u.full_name, u.is_admin, u.created_at,
+               COUNT(ss.id) as submission_count
+        FROM users u
+        LEFT JOIN session_submissions ss ON ss.matric_no = u.matric_no
+        WHERE {where}
+        GROUP BY u.matric_no
+        ORDER BY u.created_at DESC
+        LIMIT ? OFFSET ?
+    """, params + [limit, offset]).fetchall()
+    students = [dict(r) for r in rows]
+    conn.close()
+    pages = max(1, (total + limit - 1) // limit)
+    return JSONResponse({"students": students, "total": total, "page": page, "pages": pages})
+
+
+@app.get("/admin/api/submissions")
+async def api_admin_submissions(
+    request: Request, page: int = 1, limit: int = 50,
+    session_id: int = None, matric: str = None, status: str = None
+):
+    user = get_current_user(request)
+    if not user or not user["is_admin"]:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    conn = get_db()
+    where, params = [], []
+    if session_id:
+        where.append("ss.session_id = ?")
+        params.append(session_id)
+    if matric:
+        where.append("ss.matric_no LIKE ?")
+        params.append(f"%{matric}%")
+    if status:
+        where.append("ss.status = ?")
+        params.append(status)
+    w = ("WHERE " + " AND ".join(where)) if where else ""
+    total = conn.execute(f"SELECT COUNT(*) FROM session_submissions ss {w}", params).fetchone()[0]
+    offset = (page - 1) * limit
+    rows = conn.execute(f"""
+        SELECT ss.id, ss.matric_no, ss.session_id, ls.title as session_title,
+               ss.question_id, qb.title as question_title,
+               ss.language, ss.status, ss.passed, ss.total, ss.runtime_ms, ss.created_at
+        FROM session_submissions ss
+        LEFT JOIN lab_sessions ls ON ls.id = ss.session_id
+        LEFT JOIN question_bank qb ON qb.id = ss.question_id
+        {w}
+        ORDER BY ss.id DESC
+        LIMIT ? OFFSET ?
+    """, params + [limit, offset]).fetchall()
+    submissions = [dict(r) for r in rows]
+    conn.close()
+    pages = max(1, (total + limit - 1) // limit)
+    return JSONResponse({"submissions": submissions, "total": total, "page": page, "pages": pages})
 
 
 @app.on_event("startup")

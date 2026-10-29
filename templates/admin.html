@@ -32,7 +32,11 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px rgba(99,102,241,.15);
 }
 
-
+.filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md)}
+.filter-bar .field{margin:0;flex:1;min-width:140px}
+.filter-bar label{display:block;font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
+.loading-spinner{text-align:center;padding:40px 16px;color:var(--muted);font-size:.9rem}
+.ajax-table-wrap{border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;background:var(--surface)}
 </style>
 {% endblock %}
 {% block body %}
@@ -51,26 +55,27 @@ input:focus, select:focus, textarea:focus {
         <div class="sub">Admin</div>
       </div>
       <div class="nav">
-        <a href="/sessions"><span class="icon">🖥️</span> <span data-i18n="sessions">Sessions</span> (Student)</a>
-        <a href="/leaderboard"><span class="icon">🏆</span> <span data-i18n="leaderboard">Leaderboard</span></a>
+        <a href="/sessions"><span class="icon">🖥️</span> Sessions (Student)</a>
+        <a href="/leaderboard"><span class="icon">🏆</span> Leaderboard</a>
         <a href="/admin" class="active"><span class="icon">⚙️</span> Admin</a>
-        <a href="/logout"><span class="icon">🚪</span> <span data-i18n="logout">Logout</span></a>
+        <a href="/logout"><span class="icon">🚪</span> Logout</a>
       </div>
     </div>
   </div>
   <div class="right-panel">
     {% if msg %}<div class="alert alert-success">{{ msg }}</div>{% endif %}
-    {% if error %}<div class="alert alert-error">Ralat: {{ error }}</div>{% endif %}
+    {% if error %}<div class="alert alert-error">Error: {{ error }}</div>{% endif %}
+    {% if toast %}<div class="alert alert-success" id="toast-msg">{{ toast }}</div>{% endif %}
 
     <div class="tabs" id="admin-tabs">
-      <button class="tab-btn active" onclick="switchTab('sessions', this)">🖥️ Sessions ({{ sessions|length }})</button>
-      <button class="tab-btn" onclick="switchTab('questions', this)">🗂️ Questions ({{ questions|length }})</button>
-      <button class="tab-btn" onclick="switchTab('students', this)">👥 Students ({{ students|length }})</button>
-      <button class="tab-btn" onclick="switchTab('submissions', this)">📨 Submissions ({{ submissions|length }})</button>
+      <button class="tab-btn active" id="btn-sessions" onclick="switchTab('sessions', this)">🖥️ Sessions ({{ sessions|length }})</button>
+      <button class="tab-btn" id="btn-questions" onclick="switchTab('questions', this)">🗂️ Questions</button>
+      <button class="tab-btn" id="btn-students" onclick="switchTab('students', this)">👥 Students</button>
+      <button class="tab-btn" id="btn-submissions" onclick="switchTab('submissions', this)">📨 Submissions</button>
       <a href="/admin/report" class="tab-btn" style="text-decoration:none;">📊 Report</a>
     </div>
 
-    <!-- Sessions Tab -->
+    <!-- Sessions Tab (server-rendered) -->
     <div class="tab-pane active" id="tab-sessions">
       <div class="admin-form">
         <h3>+ Create New Lab Session</h3>
@@ -137,7 +142,7 @@ input:focus, select:focus, textarea:focus {
               <span style="font-weight:600;color:var(--indigo-d)">S{{ sq.question_order }}. {{ sq.title }}</span>
               <form method="post" action="/admin/sessions/{{ s.id }}/remove-question" style="display:inline">
                 <input type="hidden" name="question_id" value="{{ sq.id }}">
-                <button type="submit" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:0.85rem" title="Buang">✕</button>
+                <button type="submit" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:0.85rem" title="Remove">✕</button>
               </form>
             </div>
             {% endfor %}
@@ -151,7 +156,7 @@ input:focus, select:focus, textarea:focus {
                 {% endfor %}
               </select>
             </div>
-            <button type="submit" class="btn btn-sm btn-secondary">+ <span data-i18n="add_question">Add Question</span></button>
+            <button type="submit" class="btn btn-sm btn-secondary">+ Add Question</button>
           </form>
         </div>
       </div>
@@ -161,10 +166,10 @@ input:focus, select:focus, textarea:focus {
       {% endif %}
     </div>
 
-    <!-- Questions Tab (Question Bank) -->
+    <!-- Questions Tab (AJAX) -->
     <div class="tab-pane" id="tab-questions">
       <div class="admin-form">
-        <h3>+ <span data-i18n="add_question">Add Question</span></h3>
+        <h3>+ Add Question</h3>
         <form method="post" action="/admin/questions/add">
           <div class="grid-2">
             <div class="field">
@@ -233,54 +238,39 @@ input:focus, select:focus, textarea:focus {
             <textarea name="hidden_tests" rows="3" placeholder='[{"input":"1 2","expected_output":"3"}]'></textarea>
             <div style="font-size:0.75rem;color:var(--muted);margin-top:4px">Format: [{"input": "...", "expected_output": "..."}]</div>
           </div>
-          <button type="submit" class="btn btn-primary">+ <span data-i18n="add_question">Add Question</span></button>
+          <button type="submit" class="btn btn-primary">+ Add Question</button>
         </form>
       </div>
 
-      <div class="section-title" style="margin-bottom:16px;font-size:1.1rem"><span data-i18n="question_bank">Question Bank</span></div>
-      {% if questions %}
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Title</th>
-              <th>Course</th>
-              <th>Chapter</th>
-              <th>Difficulty</th>
-              <th>Tests</th>
-              <th>Time</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for q in questions %}
-            <tr>
-              <td>{{ q.id }}</td>
-              <td style="font-weight:600">{{ q.title }}</td>
-              <td><code style="font-size:0.82rem">{{ q.course_code }}</code></td>
-              <td>{{ q.chapter }}</td>
-              <td><span class="badge badge-{{ q.difficulty|lower }}">{{ q.difficulty|replace("Mudah","Easy")|replace("Sederhana","Medium")|replace("Susah","Hard") }}</span></td>
-              <td style="font-size:0.85rem;color:var(--muted)">{{ q.hidden_test_count }} cases</td>
-              <td>{{ q.time_limit_sec }}s</td>
-              <td style="display:flex;gap:6px;flex-wrap:wrap">
-                <a href="/admin/questions/{{ q.id }}/edit" class="btn btn-sm btn-secondary" data-i18n="edit">Edit</a>
-                <form method="post" action="/admin/questions/{{ q.id }}/delete" style="display:inline"
-                  onsubmit="return confirm('Delete this question?')">
-                  <button type="submit" class="btn btn-sm btn-danger" data-i18n="delete">Delete</button>
-                </form>
-              </td>
-            </tr>
+      <div class="filter-bar" id="q-filter-bar">
+        <div class="field">
+          <label>Search</label>
+          <input type="text" id="q-search" placeholder="Search title..." oninput="debounceQ()">
+        </div>
+        <div class="field" style="max-width:160px">
+          <label>Course</label>
+          <select id="q-course" onchange="loadQuestions(1)">
+            <option value="">All Courses</option>
+            <option value="BITP1113">BITP1113</option>
+            <option value="DFDS1513">DFDS1513</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:120px">
+          <label>Chapter</label>
+          <select id="q-chapter" onchange="loadQuestions(1)">
+            <option value="">All</option>
+            {% for ch in range(1, 15) %}
+            <option value="{{ ch }}">Ch {{ ch }}</option>
             {% endfor %}
-          </tbody>
-        </table>
+          </select>
+        </div>
       </div>
-      {% else %}
-      <div class="alert alert-info">No questions in bank yet.</div>
-      {% endif %}
+
+      <div id="q-table-container"><div class="loading-spinner">Loading questions...</div></div>
+      <div id="q-pagination"></div>
     </div>
 
-    <!-- Students Tab -->
+    <!-- Students Tab (AJAX) -->
     <div class="tab-pane" id="tab-students">
       <div class="admin-form">
         <h3>+ Add Student (Override)</h3>
@@ -296,86 +286,247 @@ input:focus, select:focus, textarea:focus {
             </div>
           </div>
           <div class="field">
-            <label>No. Telefon (Kata Laluan)</label>
+            <label>Phone Number (Password)</label>
             <input type="text" name="phone" required placeholder="0123456789">
           </div>
           <button type="submit" class="btn btn-primary">+ Add Student</button>
         </form>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>#</th><th>No. Matrik</th><th>Name</th><th>Registered</th></tr></thead>
-          <tbody>
-            {% for s in students %}
-            <tr>
-              <td>{{ s.id }}</td>
-              <td style="font-weight:600">{{ s.matric_no }}</td>
-              <td>{{ s.full_name }}</td>
-              <td style="color:var(--muted);font-size:0.85rem">{{ s.created_at }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+
+      <div class="filter-bar">
+        <div class="field">
+          <label>Search</label>
+          <input type="text" id="st-search" placeholder="Matric or name..." oninput="debounceStudents()">
+        </div>
       </div>
+
+      <div id="st-table-container"><div class="loading-spinner">Loading students...</div></div>
+      <div id="st-pagination"></div>
     </div>
 
-    <!-- Submissions Tab -->
+    <!-- Submissions Tab (AJAX) -->
     <div class="tab-pane" id="tab-submissions">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th><th>Student</th><th>Question</th><th>Language</th><th>Status</th><th>Score</th><th>Time</th><th>Date</th><th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for s in submissions %}
-            <tr>
-              <td>{{ s.id }}</td>
-              <td>
-                <div style="font-weight:600">{{ s.matric_no }}</div>
-                <div style="font-size:0.78rem;color:var(--muted)">{{ s.full_name }}</div>
-              </td>
-              <td>{{ s.problem_title }}</td>
-              <td><code style="font-size:0.8rem">{{ s.language }}</code></td>
-              <td>
-                <span class="badge badge-{{ 'accepted' if s.status == 'Accepted' else 'wrong' if s.status == 'Wrong Answer' else 'runtime' if s.status == 'Runtime Error' else 'tle' }}">
-                  {{ s.status }}
-                </span>
-              </td>
-              <td style="font-size:0.82rem;font-weight:600;">{{ s.passed }}/{{ s.total }}</td>
-              <td style="font-size:0.85rem">{{ s.runtime_ms }}ms</td>
-              <td style="font-size:0.78rem;color:var(--muted)">{{ s.created_at }}</td>
-              <td><a href="/admin/submissions/{{ s.id }}" style="padding:4px 10px;background:#EEF2FF;color:#4F46E5;border-radius:6px;font-size:.78rem;font-weight:700;text-decoration:none;">View</a></td>
-            </tr>
+      <div class="filter-bar">
+        <div class="field">
+          <label>Session</label>
+          <select id="sub-session" onchange="loadSubmissions(1)" style="background:#3730a3;color:#fff">
+            <option value="" style="background:#3730a3;color:#fff">All Sessions</option>
+            {% for s in sessions %}
+            <option value="{{ s.id }}" style="background:#3730a3;color:#fff">{{ s.title }}</option>
             {% endfor %}
-          </tbody>
-        </table>
+          </select>
+        </div>
+        <div class="field" style="max-width:200px">
+          <label>Status</label>
+          <select id="sub-status" onchange="loadSubmissions(1)" style="background:#3730a3;color:#fff">
+            <option value="" style="background:#3730a3;color:#fff">All Statuses</option>
+            <option value="Accepted" style="background:#3730a3;color:#fff">Accepted</option>
+            <option value="Wrong Answer" style="background:#3730a3;color:#fff">Wrong Answer</option>
+            <option value="Runtime Error" style="background:#3730a3;color:#fff">Runtime Error</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Student (Matric)</label>
+          <input type="text" id="sub-matric" placeholder="e.g. B012345678" oninput="debounceSubmissions()">
+        </div>
       </div>
+
+      <div id="sub-table-container"><div class="loading-spinner">Loading submissions...</div></div>
+      <div id="sub-pagination"></div>
     </div>
   </div>
 </div>
 
 <script>
+// ── State ──────────────────────────────────────────────────────────────────────
+var _loaded = {questions: false, students: false, submissions: false};
+var _qPage = 1, _stPage = 1, _subPage = 1;
+var _qTimer, _stTimer, _subTimer;
+
+// ── Tab switching ──────────────────────────────────────────────────────────────
 function switchTab(name, btn) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   if (btn) btn.classList.add('active');
-  else event.target.classList.add('active');
+  // Lazy-load on first visit
+  if (name === 'questions' && !_loaded.questions) { loadQuestions(1); }
+  if (name === 'students' && !_loaded.students) { loadStudents(1); }
+  if (name === 'submissions' && !_loaded.submissions) { loadSubmissions(1); }
 }
+
 // Auto-open tab from hash
 (function() {
   var hash = window.location.hash.replace('#tab-','');
   var tabMap = {'sessions':0,'questions':1,'students':2,'submissions':3};
   if (hash in tabMap) {
-    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('tab-' + hash).classList.add('active');
     var btns = document.querySelectorAll('.tab-btn');
-    var idx = tabMap[hash];
-    if (btns[idx]) btns[idx].classList.add('active');
+    switchTab(hash, btns[tabMap[hash]]);
   }
+})();
+
+// ── Pagination component ───────────────────────────────────────────────────────
+function renderPagination(container, page, pages, total, shown, fnName) {
+  if (pages <= 1) { container.innerHTML = ''; return; }
+  var html = '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--border);font-size:.85rem;color:var(--muted)">';
+  html += '<span>' + shown + ' of ' + total + '</span>';
+  html += '<div style="margin-left:auto;display:flex;gap:6px">';
+  html += '<button onclick="' + fnName + '(' + (page-1) + ')" ' + (page<=1?'disabled':'') + ' class="btn btn-sm btn-secondary">← Prev</button>';
+  html += '<span style="padding:4px 12px">Page ' + page + ' / ' + pages + '</span>';
+  html += '<button onclick="' + fnName + '(' + (page+1) + ')" ' + (page>=pages?'disabled':'') + ' class="btn btn-sm btn-secondary">Next →</button>';
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+// ── Status badge helper ────────────────────────────────────────────────────────
+function statusBadge(s) {
+  var cls = s === 'Accepted' ? 'accepted' : s === 'Wrong Answer' ? 'wrong' : s === 'Runtime Error' ? 'runtime' : 'tle';
+  return '<span class="badge badge-' + cls + '">' + s + '</span>';
+}
+
+function diffBadge(d) {
+  var cls = d === 'Mudah' ? 'mudah' : d === 'Sederhana' ? 'sederhana' : 'susah';
+  var label = d === 'Mudah' ? 'Easy' : d === 'Sederhana' ? 'Medium' : 'Hard';
+  return '<span class="badge badge-' + cls + '">' + label + '</span>';
+}
+
+// ── Questions ──────────────────────────────────────────────────────────────────
+function debounceQ() { clearTimeout(_qTimer); _qTimer = setTimeout(function(){ loadQuestions(1); }, 350); }
+
+function loadQuestions(page) {
+  _qPage = page;
+  var search = document.getElementById('q-search').value.trim();
+  var course = document.getElementById('q-course').value;
+  var chapter = document.getElementById('q-chapter').value;
+  var params = '?page=' + page + '&limit=50';
+  if (search) params += '&search=' + encodeURIComponent(search);
+  if (course) params += '&course=' + encodeURIComponent(course);
+  if (chapter) params += '&chapter=' + chapter;
+  document.getElementById('q-table-container').innerHTML = '<div class="loading-spinner">⏳ Loading...</div>';
+  fetch('/admin/api/questions' + params).then(r => r.json()).then(function(data) {
+    _loaded.questions = true;
+    var btn = document.getElementById('btn-questions');
+    btn.textContent = '🗂️ Questions (' + data.total + ')';
+    var shown = Math.min(page * 50, data.total) - (page-1)*50;
+    if (!data.questions || data.questions.length === 0) {
+      document.getElementById('q-table-container').innerHTML = '<div class="alert alert-info" style="margin:16px">No questions found.</div>';
+      document.getElementById('q-pagination').innerHTML = '';
+      return;
+    }
+    var html = '<div class="ajax-table-wrap"><table><thead><tr><th>#</th><th>Title</th><th>Course</th><th>Ch</th><th>Difficulty</th><th>Test Cases</th><th>Actions</th></tr></thead><tbody>';
+    data.questions.forEach(function(q) {
+      html += '<tr>';
+      html += '<td style="color:var(--muted);font-size:.82rem">' + q.id + '</td>';
+      html += '<td style="font-weight:600">' + escHtml(q.title) + '</td>';
+      html += '<td><code style="font-size:.82rem">' + q.course_code + '</code></td>';
+      html += '<td>' + q.chapter + '</td>';
+      html += '<td>' + diffBadge(q.difficulty) + '</td>';
+      html += '<td style="font-size:.85rem;color:var(--muted)">' + q.hidden_test_count + ' cases</td>';
+      html += '<td style="display:flex;gap:6px;flex-wrap:wrap">';
+      html += '<a href="/admin/questions/' + q.id + '/edit" class="btn btn-sm btn-secondary">Edit</a>';
+      html += '<form method="post" action="/admin/questions/' + q.id + '/delete" style="display:inline" onsubmit="return confirm(\'Delete this question?\')"><button type="submit" class="btn btn-sm btn-danger">Delete</button></form>';
+      html += '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    document.getElementById('q-table-container').innerHTML = html;
+    renderPagination(document.getElementById('q-pagination'), data.page, data.pages, data.total, shown, 'loadQuestions');
+  }).catch(function(e) {
+    document.getElementById('q-table-container').innerHTML = '<div class="alert alert-error" style="margin:16px">Error loading questions: ' + e + '</div>';
+  });
+}
+
+// ── Students ───────────────────────────────────────────────────────────────────
+function debounceStudents() { clearTimeout(_stTimer); _stTimer = setTimeout(function(){ loadStudents(1); }, 350); }
+
+function loadStudents(page) {
+  _stPage = page;
+  var search = document.getElementById('st-search').value.trim();
+  var params = '?page=' + page + '&limit=50';
+  if (search) params += '&search=' + encodeURIComponent(search);
+  document.getElementById('st-table-container').innerHTML = '<div class="loading-spinner">⏳ Loading...</div>';
+  fetch('/admin/api/students' + params).then(r => r.json()).then(function(data) {
+    _loaded.students = true;
+    var btn = document.getElementById('btn-students');
+    btn.textContent = '👥 Students (' + data.total + ')';
+    var shown = Math.min(page * 50, data.total) - (page-1)*50;
+    if (!data.students || data.students.length === 0) {
+      document.getElementById('st-table-container').innerHTML = '<div class="alert alert-info" style="margin:16px">No students found.</div>';
+      document.getElementById('st-pagination').innerHTML = '';
+      return;
+    }
+    var html = '<div class="ajax-table-wrap"><table><thead><tr><th>Matric No</th><th>Full Name</th><th>Submissions</th><th>Joined</th></tr></thead><tbody>';
+    data.students.forEach(function(s) {
+      html += '<tr>';
+      html += '<td style="font-weight:600">' + escHtml(s.matric_no) + '</td>';
+      html += '<td>' + escHtml(s.full_name) + '</td>';
+      html += '<td style="font-size:.85rem;color:var(--muted)">' + (s.submission_count || 0) + '</td>';
+      html += '<td style="font-size:.78rem;color:var(--muted)">' + (s.created_at || '-') + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    document.getElementById('st-table-container').innerHTML = html;
+    renderPagination(document.getElementById('st-pagination'), data.page, data.pages, data.total, shown, 'loadStudents');
+  }).catch(function(e) {
+    document.getElementById('st-table-container').innerHTML = '<div class="alert alert-error" style="margin:16px">Error loading students: ' + e + '</div>';
+  });
+}
+
+// ── Submissions ────────────────────────────────────────────────────────────────
+function debounceSubmissions() { clearTimeout(_subTimer); _subTimer = setTimeout(function(){ loadSubmissions(1); }, 350); }
+
+function loadSubmissions(page) {
+  _subPage = page;
+  var session = document.getElementById('sub-session').value;
+  var status = document.getElementById('sub-status').value;
+  var matric = document.getElementById('sub-matric').value.trim();
+  var params = '?page=' + page + '&limit=50';
+  if (session) params += '&session_id=' + session;
+  if (status) params += '&status=' + encodeURIComponent(status);
+  if (matric) params += '&matric=' + encodeURIComponent(matric);
+  document.getElementById('sub-table-container').innerHTML = '<div class="loading-spinner">⏳ Loading...</div>';
+  fetch('/admin/api/submissions' + params).then(r => r.json()).then(function(data) {
+    _loaded.submissions = true;
+    var btn = document.getElementById('btn-submissions');
+    btn.textContent = '📨 Submissions (' + data.total + ')';
+    var shown = Math.min(page * 50, data.total) - (page-1)*50;
+    if (!data.submissions || data.submissions.length === 0) {
+      document.getElementById('sub-table-container').innerHTML = '<div class="alert alert-info" style="margin:16px">No submissions found.</div>';
+      document.getElementById('sub-pagination').innerHTML = '';
+      return;
+    }
+    var html = '<div class="ajax-table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Session</th><th>Question</th><th>Lang</th><th>Status</th><th>Score</th><th>Time</th><th>Date</th><th></th></tr></thead><tbody>';
+    data.submissions.forEach(function(s) {
+      html += '<tr>';
+      html += '<td style="color:var(--muted);font-size:.82rem">' + s.id + '</td>';
+      html += '<td style="font-weight:600">' + escHtml(s.matric_no) + '</td>';
+      html += '<td style="font-size:.82rem">' + escHtml(s.session_title || '-') + '</td>';
+      html += '<td style="font-size:.82rem">' + escHtml(s.question_title || '-') + '</td>';
+      html += '<td><code style="font-size:.8rem">' + escHtml(s.language) + '</code></td>';
+      html += '<td>' + statusBadge(s.status) + '</td>';
+      html += '<td style="font-size:.82rem;font-weight:600">' + (s.passed||0) + '/' + (s.total||0) + '</td>';
+      html += '<td style="font-size:.85rem">' + (s.runtime_ms||0) + 'ms</td>';
+      html += '<td style="font-size:.78rem;color:var(--muted)">' + (s.created_at||'-') + '</td>';
+      html += '<td><a href="/admin/submissions/' + s.id + '" style="padding:4px 10px;background:#EEF2FF;color:#4F46E5;border-radius:6px;font-size:.78rem;font-weight:700;text-decoration:none;">View</a></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    document.getElementById('sub-table-container').innerHTML = html;
+    renderPagination(document.getElementById('sub-pagination'), data.page, data.pages, data.total, shown, 'loadSubmissions');
+  }).catch(function(e) {
+    document.getElementById('sub-table-container').innerHTML = '<div class="alert alert-error" style="margin:16px">Error loading submissions: ' + e + '</div>';
+  });
+}
+
+// ── Utils ──────────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Auto-dismiss toast
+(function() {
+  var t = document.getElementById('toast-msg');
+  if (t) setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity .5s'; setTimeout(function(){t.remove();},500); }, 3000);
 })();
 </script>
 {% endblock %}
