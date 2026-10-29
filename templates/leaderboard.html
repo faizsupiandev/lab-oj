@@ -127,4 +127,22 @@
 </div>
 
 <script>document.getElementById('lang-toggle-wrap').style.display='block';</script>
+
+{% if current_session %}
+<script>
+(function() {
+  var countdown = 30;
+  var badge = document.createElement('div');
+  badge.style.cssText = 'position:fixed;bottom:70px;right:24px;background:#1E1B4B;color:#fff;padding:6px 14px;border-radius:20px;font-size:.75rem;font-weight:600;z-index:8887;opacity:.85';
+  document.body.appendChild(badge);
+  function tick() {
+    badge.textContent = '🔄 Refresh in ' + countdown + 's';
+    if (countdown <= 0) { badge.textContent = '🔄 Refreshing...'; window.location.reload(); return; }
+    countdown--;
+    setTimeout(tick, 1000);
+  }
+  tick();
+})();
+</script>
+{% endif %}
 {% endblock %}

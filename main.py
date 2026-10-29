@@ -696,7 +696,9 @@ async def submit_session_code(
         total_ms += elapsed_ms
 
         run = piston_result.get("run", {})
-        stdout = run.get("stdout", "").strip()
+        # Strip trailing whitespace per line for fair comparison
+        raw_stdout = run.get("stdout", "")
+        stdout = "\n".join(line.rstrip() for line in raw_stdout.splitlines()).strip()
         stderr = run.get("stderr", "")
         exit_code = run.get("code", 0)
         last_stdout = stdout
@@ -877,7 +879,8 @@ async def submit_code(request: Request, problem_id: int,
         elapsed = int((time.time() - t0) * 1000)
         total_ms += elapsed
         run = result.get("run", {})
-        stdout = run.get("stdout", "").strip()
+        raw_stdout = run.get("stdout", "")
+        stdout = "\n".join(line.rstrip() for line in raw_stdout.splitlines()).strip()
         stderr = run.get("stderr", "")
         exit_code = run.get("code", 0)
         last_stdout = stdout
